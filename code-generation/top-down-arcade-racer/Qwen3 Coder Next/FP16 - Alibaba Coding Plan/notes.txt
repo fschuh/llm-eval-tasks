@@ -1,0 +1,6 @@
+- Developed using Roo Code
+- This model took very long to finish the task, and used up 320 requests or 27% of my 5-hour quota
+- Roo Code stopped it several times asking me if I wanted to continue, due to the model getting stuck in some loop
+- I didn't have to prompt it to intervene though - just told Roo to continue as is
+- It wrote implementation code in technical-specification.md which I found strange
+- The resulting game is non-functional (javascript errors during initial load)

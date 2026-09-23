@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#141817">
+  <title>APEX — Club Circuit</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <a class="brand" href="./" aria-label="Apex home"><span class="brand-symbol" aria-hidden="true"><i></i><i></i><i></i></span>APEX<span class="brand-divider"></span><span class="brand-sub">THE DRIVER'S CLUB</span></a>
+      <div class="header-right"><span class="status-dot"></span> LOCAL RACE <span class="version">VOL. 01</span></div>
+    </header>
+
+    <section class="race-title">
+      <div><div class="eyebrow">CLUB SERIES <span>/</span> ROUND 01</div><h1>Find your racing line<span>.</span></h1><p>Four drivers. Three laps. Every corner counts.</p></div>
+      <div class="circuit-label"><span class="circuit-icon" aria-hidden="true">↗</span><div><strong>GREENWOOD CIRCUIT</strong><span>03 LAPS <b>·</b> DRY CONDITIONS</span></div></div>
+    </section>
+
+    <section class="race-panel" aria-label="Racing game">
+      <div class="telemetry">
+        <div class="stat"><span class="stat-label">POSITION</span><div><strong id="position">4</strong><span class="stat-denominator"> / 4</span><span class="stat-note" id="position-note">ON THE GRID</span></div></div>
+        <div class="stat"><span class="stat-label">LAP</span><div><strong id="lap">01</strong><span class="stat-denominator"> / 03</span><span class="lap-pips" aria-hidden="true"><i class="active"></i><i></i><i></i></span></div></div>
+        <div class="stat"><span class="stat-label">RACE TIME</span><div><strong class="timer" id="race-time">00:00.000</strong></div></div>
+        <div class="stat best-stat"><span class="stat-label">BEST LAP <span class="tiny-star">✦</span></span><div><strong class="timer muted" id="best-lap">--:--.---</strong></div></div>
+        <button id="pause" class="icon-button" aria-label="Pause race" title="Pause (P)" disabled>Ⅱ</button>
+      </div>
+
+      <div class="game-viewport" id="viewport">
+        <canvas id="race-canvas" width="1440" height="900" tabindex="0" aria-label="Top-down racing circuit. Drive with arrow keys or WASD. Space is handbrake, P pauses, and R restarts."></canvas>
+        <div class="track-caption"><span class="status-dot"></span> GREENWOOD <span class="track-caption-divider">/</span> <span>CLUB LAYOUT</span></div>
+        <div class="leaderboard"><div class="leaderboard-title">RUNNING ORDER <span>LIVE</span></div><ol id="standings"></ol></div>
+        <div class="speedometer"><div class="speed-value"><strong id="speed">0</strong><span>KM/H</span></div><div class="speed-bars" id="speed-bars" aria-hidden="true"></div><div class="speed-footer"><span id="gear">N</span><span id="surface">READY TO RACE</span></div></div>
+        <div class="track-meta"><span class="weather-sun" aria-hidden="true">☼</span><span>24°<small>TRACK TEMP.</small></span><span class="track-meta-line"></span><span>12<small>CORNERS</small></span></div>
+        <div id="toast" class="toast" role="status" aria-live="polite"></div>
+        <div id="countdown" class="countdown" aria-live="assertive"></div>
+
+        <div id="overlay" class="overlay">
+          <div class="start-card" id="start-card">
+            <div class="card-tag"><span class="status-dot"></span> YOUR GRID IS READY</div>
+            <h2>Chase the<br>checkered flag<span>.</span></h2>
+            <p>Take the wheel. Find the apex.<br>Leave the rest behind.</p>
+            <button class="primary-button" id="start">LET'S RACE <span>↗</span></button>
+            <div class="start-hint"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd><span>or WASD to drive</span></div>
+          </div>
+          <div class="pause-card hidden" id="pause-card"><div class="card-tag">TAKE A BREATHER</div><h2>In the pits<span>.</span></h2><p>Your race is right where you left it.</p><button class="primary-button" id="resume">BACK ON TRACK <span>↗</span></button></div>
+          <div class="finish-card hidden" id="finish-card"><div class="card-tag">CHECKERED FLAG</div><h2 id="finish-title">Race complete<span>.</span></h2><p id="finish-summary"></p><div id="finish-results" class="finish-results"></div><button class="primary-button" id="race-again">ONE MORE RACE <span>↗</span></button></div>
+        </div>
+        <div class="touch-controls" aria-label="Touch driving controls"><div><button data-control="left" aria-label="Steer left">←</button><button data-control="right" aria-label="Steer right">→</button></div><div><button data-control="brake" aria-label="Brake">↓</button><button data-control="throttle" aria-label="Accelerate">↑</button></div></div>
+      </div>
+
+      <div class="control-bar"><div class="control-instructions"><span><kbd>W</kbd><kbd>↑</kbd> ACCELERATE</span><span><kbd>S</kbd><kbd>↓</kbd> BRAKE / REVERSE</span><span><kbd>A</kbd><kbd>D</kbd> STEER</span><span><kbd>SPACE</kbd> HANDBRAKE</span></div><button id="restart" class="text-button"><span>↻</span> RESTART <kbd>R</kbd></button></div>
+    </section>
+
+    <footer><span><span class="footer-mark">↗</span> BUILT FOR THE NEXT CORNER.</span><span><button class="footer-button" id="sound" aria-pressed="false">SOUND OFF</button><span class="footer-separator">/</span> SEED <span id="seed-label">2048</span><span class="footer-separator">/</span> 120 HZ SIMULATION</span></footer>
+  </main>
+  <script src="simulation.js"></script>
+  <script src="renderer.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

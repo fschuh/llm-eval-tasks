@@ -1,0 +1,2 @@
+- Developed using Codex extension inside Visual Studio Code
+- The resulting game was non-functional (javascript errors during startup)

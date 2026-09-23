@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top-Down Arcade Racer</title>
+    <style>
+        /* Reset and full-screen layout */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #1a1a2e;
+        }
+
+        /* Full-screen canvas */
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Loading overlay (hidden by default, shown during initialization) */
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(26, 26, 46, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #ffffff;
+            font-family: monospace;
+            z-index: 1000;
+        }
+
+        #loadingOverlay.hidden {
+            display: none;
+        }
+
+        #loadingOverlay h1 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: #FFD700;
+        }
+
+        #loadingOverlay p {
+            font-size: 1rem;
+            color: #8a8aaa;
+        }
+
+        /* Controls hint overlay */
+        #controlsHint {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #ffffff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            z-index: 100;
+        }
+
+        #controlsHint.hidden {
+            display: none;
+        }
+
+        #controlsHint kbd {
+            background-color: #4a4a6a;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin: 0 2px;
+        }
+
+        /* Error overlay */
+        #errorOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(139, 0, 0, 0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #ffffff;
+            font-family: monospace;
+            z-index: 2000;
+        }
+
+        #errorOverlay h1 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        #errorOverlay p {
+            font-size: 1rem;
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        /* Pause overlay */
+        #pauseOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 500;
+        }
+
+        #pauseOverlay.hidden {
+            display: none;
+        }
+
+        #pauseOverlay h1 {
+            font-family: monospace;
+            font-size: 3rem;
+            color: #ffffff;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay">
+        <h1>🏁 Top-Down Arcade Racer 🏁</h1>
+        <p>Loading game...</p>
+    </div>
+
+    <!-- Controls Hint -->
+    <div id="controlsHint">
+        <kbd>W</kbd>/<kbd>↑</kbd> Accelerate | 
+        <kbd>S</kbd>/<kbd>↓</kbd> Brake/Reverse | 
+        <kbd>A</kbd>/<kbd>←</kbd> Steer Left | 
+        <kbd>D</kbd>/<kbd>→</kbd> Steer Right |
+        <kbd>R</kbd> Restart |
+        <kbd>P</kbd> Pause
+    </div>
+
+    <!-- Error Overlay -->
+    <div id="errorOverlay">
+        <h1>Error</h1>
+        <p id="errorMessage"></p>
+    </div>
+
+    <!-- Pause Overlay -->
+    <div id="pauseOverlay" class="hidden">
+        <h1>PAUSED</h1>
+    </div>
+
+    <!-- Game Script (ES Module) -->
+    <script type="module">
+        import RacingGame from './src/game/racingGame.js';
+
+        /**
+         * Main game initialization and setup.
+         * Creates the canvas, initializes the RacingGame instance, and starts the loop.
+         */
+        function initGame() {
+            try {
+                // Get canvas element
+                const canvas = document.getElementById('gameCanvas');
+                
+                if (!canvas) {
+                    throw new Error('Canvas element not found. Please ensure <canvas id="gameCanvas"> exists in your HTML.');
+                }
+
+                // Set canvas size to window dimensions
+                function resizeCanvas() {
+                    canvas.width = window.innerWidth;
+                    canvas.height = window.innerHeight;
+                }
+                
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
+
+                // Create game instance with deterministic seed
+                const SEED = 12345; // Change this for different AI behavior
+                const game = new RacingGame(canvas, SEED);
+
+                // Initialize the game (creates track, cars, etc.)
+                game.initialize();
+
+                // Hide loading overlay
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                if (loadingOverlay) {
+                    loadingOverlay.classList.add('hidden');
+                }
+
+                // Start the game loop
+                game.start();
+
+                // Add restart handler (R key)
+                window.addEventListener('keydown', (e) => {
+                    if (e.key === 'r' || e.key === 'R') {
+                        game.reset();
+                    }
+                    
+                    // Pause toggle (P key)
+                    if (e.key === 'p' || e.key === 'P') {
+                        const pauseOverlay = document.getElementById('pauseOverlay');
+                        if (game.gameLoop.getPaused()) {
+                            game.gameLoop.resume();
+                            pauseOverlay.classList.add('hidden');
+                        } else {
+                            game.gameLoop.pause();
+                            pauseOverlay.classList.remove('hidden');
+                        }
+                    }
+                });
+
+                // Log game info to console
+                console.log('Game initialized:', game.toString());
+                console.log('Controls: W/↑ = Accelerate, S/↓ = Brake, A/← = Steer Left, D/→ = Steer Right');
+                console.log('R = Restart Race, P = Pause');
+
+            } catch (error) {
+                // Show error overlay
+                const errorOverlay = document.getElementById('errorOverlay');
+                const errorMessage = document.getElementById('errorMessage');
+                
+                if (errorOverlay && errorMessage) {
+                    errorMessage.textContent = error.message || 'An unknown error occurred.';
+                    errorOverlay.style.display = 'flex';
+                }
+
+                // Hide loading overlay
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                if (loadingOverlay) {
+                    loadingOverlay.classList.add('hidden');
+                }
+
+                console.error('Game initialization failed:', error);
+            }
+        }
+
+        // Initialize game when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initGame);
+        } else {
+            initGame();
+        }
+    </script>
+</body>
+</html>

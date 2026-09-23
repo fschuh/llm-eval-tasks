@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Top-Down Racer — prototype</title>
+<style>
+  html,body{margin:0;height:100%;background:#0e0f13;overflow:hidden}
+  #wrap{display:flex;align-items:center;justify-content:center;height:100%}
+  canvas{background:#10240f;box-shadow:0 0 40px #000}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="c" width="1280" height="800"></canvas></div>
+<script>
+"use strict";
+/* ================= deterministic RNG (mulberry32) ================= */
+const SEED = 0xC0FFEE;
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ================= track (closed Catmull-Rom loop) ================= */
+const CONTROL = [
+  [220,210],[560,140],[980,160],[1380,240],[1480,480],[1330,710],
+  [1040,780],[820,520],[620,900],[360,810],[150,620],[190,360]
+];
+function catmull(p0,p1,p2,p3,t){
+  const t2=t*t, t3=t2*t;
+  return [
+    0.5*(2*p1[0] + (p2[0]-p0[0])*t + (2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2 + (3*p1[0]-p0[0]-3*p2[0]+p3[0])*t3),
+    0.5*(2*p1[1] + (p2[1]-p0[1])*t + (2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2 + (3*p1[1]-p0[1]-3*p2[1]+p3[1])*t3)
+  ];
+}
+const CENTER=[];
+{
+  const n=CONTROL.length;
+  for(let i=0;i<n;i++){
+    const p0=CONTROL[(i-1+n)%n], p1=CONTROL[i], p2=CONTROL[(i+1)%n], p3=CONTROL[(i+2)%n];
+    for(let j=0;j<32;j++) CENTER.push(catmull(p0,p1,p2,p3,j/32));
+  }
+}
+const N=CENTER.length;
+const TANG=CENTER.map((p,i)=>{
+  const a=CENTER[(i-1+N)%N], b=CENTER[(i+1)%N];
+  const dx=b[0]-a[0], dy=b[1]-a[1], l=Math.hypot(dx,dy)||1;
+  return [dx/l, dy/l];
+});
+function nearestIdx(x,y,hint,range){
+  let bi=-1, bd=Infinity;
+  if(hint<0){
+    for(let i=0;i<N;i++){
+      const dx=CENTER[i][0]-x, dy=CENTER[i][1]-y, d=dx*dx+dy*dy;
+      if(d<bd){bd=d;bi=i;}
+    }
+  }else{
+    for(let o=-range;o<=range;o++){
+      const i=(hint+o+N)%N;
+      const dx=CENTER[i][0]-x, dy=CENTER[i][1]-y, d=dx*dx+dy*dy;
+      if(d<bd){bd=d;bi=i;}
+    }
+  }
+  return bi;
+}
+
+/* ================= constants ================= */
+const DT=1/120;            // fixed physics timestep (Hz: 120)
+const TOTAL_LAPS=3;
+const ROAD_HALF=55;
+const CAR_R=13;
+const ACCEL=470, BRAKE=850, REV_MAX=150, MAX_SPEED=540;
+const DRAG=0.55, GRIP=9, TURN=2.5, REST=0.35;
+
+/* ================= canvas ================= */
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const W=canvas.width, H=canvas.height;
+
+/* ================= state ================= */
+let CARS=[], state='countdown', countdown=3, raceTime=0;
+let cam={x:0,y:0};
+
+class Car{
+  constructor(def){
+    this.name=def.name; this.color=def.color; this.isPlayer=!!def.isPlayer;
+    this.pos={x:0,y:0}; this.heading=0; this.vel={x:0,y:0};
+    this.mass=1; this.skill={speed:1,brake:1,look:8};
+    this.lap=1; this.half=false; this.idx=0; this.distToCenter=0;
+    this.lapStart=0; this.lastLap=0; this.bestLap=Infinity;
+    this.finished=false; this.finishTime=0; this.speed=0;
+  }
+}
+
+function makeCars(){
+  const rng=mulberry32(SEED);
+  const defs=[
+    {name:'RIVAL-1', color:'#e74c3c', isPlayer:false},
+    {name:'RIVAL-2', color:'#f1c40f', isPlayer:false},
+    {name:'RIVAL-3', color:'#9b59b6', isPlayer:false},
+    {name:'YOU',     color:'#2ecc71', isPlayer:true}
+  ];
+  const cars=defs.map(d=>{
+    const c=new Car(d);
+    c.skill={ speed:0.94+rng()*0.09, brake:0.9+rng()*0.2, look:6+Math.floor(rng()*5) };
+    c.mass=0.95+rng()*0.1;
+    return c;
+  });
+  // starting grid: AIs in front, player at the back
+  const order=[cars[0],cars[1],cars[2],cars[3]];
+  order.forEach((c,s)=>{
+    const idx=(N-8-s*6)%N;
+    const t=TANG[idx];
+    const off=(s%2===0?1:-1)*(14+rng()*14);
+    c.pos={ x:CENTER[idx][0]-t[1]*off, y:CENTER[idx][1]+t[0]*off };
+    c.heading=Math.atan2(t[1],t[0]);
+    c.idx=idx;
+  });
+  return cars;
+}
+
+/* ================= input ================= */
+const keys=Object.create(null);
+function onKey(e,down){
+  const c=e.code;
+  if(c==='ArrowUp'||c==='ArrowDown'||c==='ArrowLeft'||c==='ArrowRight'||c==='Space') e.preventDefault();
+  keys[c]=down;
+  if(down && c==='KeyR') resetRace();
+}
+addEventListener('keydown',e=>onKey(e,true));
+addEventListener('keyup',e=>onKey(e,false));
+addEventListener('blur',()=>{ for(const k in keys) keys[k]=false; });
+function playerInput(){
+  return {
+    throttle:(keys.ArrowUp||keys.KeyW)?1:0,
+    brake:(keys.ArrowDown||keys.KeyS)?1:0,
+    steer:((keys.ArrowRight||keys.KeyD)?1:0)-((keys.ArrowLeft||keys.KeyA)?1:0)
+  };
+}
+
+/* ================= AI: waypoint following + curvature speed control ================= */
+function aiThink(c){
+  const la=c.skill.look+Math.floor(c.speed/50);
+  const t=CENTER[(c.idx+la)%N];
+  const desired=Math.atan2(t[1]-c.pos.y, t[0]-c.pos.x);
+  let diff=desired-c.heading;
+  while(diff>Math.PI)diff-=2*Math.PI;
+  while(diff<-Math.PI)diff+=2*Math.PI;
+  const steer=Math.max(-1,Math.min(1,diff*2.5));
+  const a1=TANG[(c.idx+la)%N], a2=TANG[(c.idx+la+14)%N];
+  let da=Math.atan2(a2[1],a2[0])-Math.atan2(a1[1],a1[0]);
+  while(da>Math.PI)da-=2*Math.PI;
+  while(da<-Math.PI)da+=2*Math.PI;
+  const maxV=MAX_SPEED*c.skill.speed*(1-0.55*Math.min(1,Math.abs(da)/1.1));
+  const vf=c.vel.x*Math.cos(c.heading)+c.vel.y*Math.sin(c.heading);
+  return {
+    steer,
+    throttle: vf<maxV ? 1 : 0,
+    brake: vf>maxV+25 ? 1 : 0
+  };
+}
+
+/* ================= car physics (arcade, impulse-free engine model) ================= */
+function stepCar(c,dt,input){
+  const f0x=Math.cos(c.heading), f0y=Math.sin(c.heading);
+  const vf0=c.vel.x*f0x+c.vel.y*f0y;
+  const sf=Math.max(-1,Math.min(1,vf0/140));
+  c.heading+=input.steer*TURN*dt*sf;
+  const fx=Math.cos(c.heading), fy=Math.sin(c.heading);
+  const rx=-fy, ry=fx;
+  let vf=c.vel.x*fx+c.vel.y*fy;
+  let vl=c.vel.x*rx+c.vel.y*ry;
+  const maxV=MAX_SPEED*c.skill.speed;
+  if(input.throttle>0) vf+=ACCEL*input.throttle*dt;
+  if(input.brake>0){
+    if(vf>10) vf-=BRAKE*c.skill.brake*input.brake*dt;
+    else vf-=ACCEL*0.45*input.brake*dt;
+  }
+  vf-=vf*DRAG*dt;
+  if(vf>maxV)vf=maxV;
+  if(vf<-REV_MAX)vf=-REV_MAX;
+  vl-=vl*GRIP*dt;
+  if(c.distToCenter>ROAD_HALF-CAR_R){ vf-=vf*3*dt; vl-=vl*3*dt; } // off-road drag
+  c.vel.x=fx*vf+rx*vl;
+  c.vel.y=fy*vf+ry*vl;
+  c.pos.x+=c.vel.x*dt;
+  c.pos.y+=c.vel.y*dt;
+  c.speed=Math.hypot(c.vel.x,c.vel.y);
+}
+
+/* ================= lap / progress tracking ================= */
+function updateProgress(c){
+  const prev=c.idx;
+  let idx=nearestIdx(c.pos.x,c.pos.y,prev,14);
+  let d=Math.hypot(CENTER[idx][0]-c.pos.x, CENTER[idx][1]-c.pos.y);
+  if(d>ROAD_HALF*2.2){ // lost the local search (way off track): full rescan
+    idx=nearestIdx(c.pos.x,c.pos.y,-1,0);
+    d=Math.hypot(CENTER[idx][0]-c.pos.x, CENTER[idx][1]-c.pos.y);
+  }
+  c.idx=idx; c.distToCenter=d;
+  if(prev>N*0.75 && idx<N*0.25){ // crossed start line forward
+    if(c.half){
+      const lt=raceTime-c.lapStart;
+      c.lastLap=lt;
+      if(lt<c.bestLap)c.bestLap=lt;
+      c.lapStart=raceTime;
+      c.lap++;
+      c.half=false;
+      if(c.lap>TOTAL_LAPS){ c.finished=true; c.finishTime=raceTime; }
+    }
+  }else if(prev<N*0.25 && idx>N*0.75){ // crossed backwards: cancel checkpoint
+    c.half=false;
+  }
+  if(idx>N*0.35 && idx<N*0.65) c.half=true; // mid-track checkpoint
+}
+
+/* ================= collision: circle vs circle, impulse resolution ================= */
+function resolveCollisions(){
+  for(let i=0;i<CARS.length;i++)for(let j=i+1;j<CARS.length;j++){
+    const a=CARS[i], b=CARS[j];
+    let dx=b.pos.x-a.pos.x, dy=b.pos.y-a.pos.y;
+    let d=Math.hypot(dx,dy);
+    const min=CAR_R*2;
+    if(d===0){ dx=1; dy=0; d=0.001; }
+    if(d<min){
+      const nx=dx/d, ny=dy/d;
+      const overlap=min-d;
+      const wa=1/a.mass, wb=1/b.mass, wsum=wa+wb;
+      a.pos.x-=nx*overlap*wa/wsum; a.pos.y-=ny*overlap*wa/wsum;
+      b.pos.x+=nx*overlap*wb/wsum; b.pos.y+=ny*overlap*wb/wsum;
+      const rel=(b.vel.x-a.vel.x)*nx+(b.vel.y-a.vel.y)*ny;
+      if(rel<0){
+        const jimp=-(1+REST)*rel/wsum;
+        a.vel.x-=jimp*nx*wa; a.vel.y-=jimp*ny*wa;
+        b.vel.x+=jimp*nx*wb; b.vel.y+=jimp*ny*wb;
+      }
+    }
+  }
+}
+
+/* ================= fixed-timestep simulation ================= */
+function step(dt){
+  if(state==='countdown'){
+    countdown-=dt;
+    if(countdown<=0){ state='racing'; raceTime=0; for(const c of CARS) c.lapStart=0; }
+    return;
+  }
+  if(state!=='racing') return;
+  raceTime+=dt;
+  for(const c of CARS){
+    const input=c.isPlayer?playerInput():aiThink(c);
+    stepCar(c,dt,input);
+    updateProgress(c);
+  }
+  resolveCollisions();
+  const p=CARS[3];
+  if(p.finished){ state='finished'; }
+  cam.x+=(p.pos.x-cam.x)*Math.min(1,6*dt);
+  cam.y+=(p.pos.y-cam.y)*Math.min(1,6*dt);
+}
+
+function resetRace(){
+  CARS=makeCars();
+  state='countdown'; countdown=3; raceTime=0;
+  cam={x:CARS[3].pos.x, y:CARS[3].pos.y};
+}
+resetRace();
+
+/* ================= standings ================= */
+function standings(){
+  const rank=CARS.map(c=>({c, fin:c.finished, t:c.finishTime, prog:c.lap*N+c.idx}));
+  rank.sort((a,b)=> (b.fin-a.fin) || (a.fin? a.t-b.t : b.prog-a.prog));
+  return rank;
+}
+
+/* ================= rendering ================= */
+function pathCenter(){
+  ctx.beginPath();
+  ctx.moveTo(CENTER[0][0],CENTER[0][1]);
+  for(let i=1;i<N;i++) ctx.lineTo(CENTER[i][0],CENTER[i][1]);
+  ctx.closePath();
+}
+function drawTrack(){
+  ctx.lineJoin='round'; ctx.lineCap='round';
+  pathCenter(); ctx.strokeStyle='#20242b'; ctx.lineWidth=ROAD_HALF*2+10; ctx.stroke();
+  pathCenter(); ctx.strokeStyle='#3c414b'; ctx.lineWidth=ROAD_HALF*2; ctx.stroke();
+  pathCenter(); ctx.setLineDash([16,22]); ctx.strokeStyle='#aeb4bf'; ctx.lineWidth=3; ctx.stroke();
+  ctx.setLineDash([]);
+  // start / finish checkers
+  const p=CENTER[0], t=TANG[0], s=11;
+  ctx.save();
+  ctx.translate(p[0],p[1]);
+  ctx.rotate(Math.atan2(t[1],t[0]));
+  for(let k=-5;k<=5;k++)for(let r=0;r<2;r++){
+    ctx.fillStyle=((k+r)&1)?'#15151a':'#e8e8e8';
+    ctx.fillRect(r*s-s/2, k*s-s/2, s, s);
+  }
+  ctx.restore();
+}
+function drawCar(c){
+  ctx.save();
+  ctx.translate(c.pos.x,c.pos.y);
+  ctx.rotate(c.heading);
+  ctx.fillStyle=c.color;
+  ctx.fillRect(-16,-9,32,18);
+  ctx.fillStyle='rgba(0,0,0,0.35)';
+  ctx.fillRect(-8,-6,10,12);
+  ctx.fillStyle='#fff';
+  ctx.fillRect(12,-9,4,18);
+  if(c.isPlayer){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.strokeRect(-16,-9,32,18); }
+  ctx.restore();
+}
+function fmt(t){
+  if(t===0||!isFinite(t))return '--:--.--';
+  const m=Math.floor(t/60), s=Math.floor(t%60), cs=Math.floor((t*100)%100);
+  return m+':'+String(s).padStart(2,'0')+'.'+String(cs).padStart(2,'0');
+}
+/* minimap geometry (precomputed) */
+const MM={x:W-226,y:16,w:210,h:150};
+{
+  let mnx=Infinity,mny=Infinity,mxx=-Infinity,mxy=-Infinity;
+  for(const p of CENTER){ mnx=Math.min(mnx,p[0]); mxx=Math.max(mxx,p[0]); mny=Math.min(mny,p[1]); mxy=Math.max(mxy,p[1]); }
+  const s=Math.min((MM.w-24)/(mxx-mnx),(MM.h-24)/(mxy-mny));
+  MM.s=s; MM.ox=MM.x+12+((MM.w-24)-(mxx-mnx)*s)/2-mnx*s; MM.oy=MM.y+12+((MM.h-24)-(mxy-mny)*s)/2-mny*s;
+}
+function drawHUD(){
+  const p=CARS[3];
+  const st=standings();
+  const pos=st.findIndex(x=>x.c===p)+1;
+  // left panel
+  ctx.fillStyle='rgba(0,0,0,0.55)';
+  ctx.fillRect(16,16,215,158);
+  ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1;
+  ctx.strokeRect(16,16,215,158);
+  ctx.font='bold 17px monospace'; ctx.textAlign='left';
+  ctx.fillStyle='#fff';
+  ctx.fillText('POS  '+pos+'/'+CARS.length, 30, 44);
+  ctx.fillText('LAP  '+Math.min(p.lap,TOTAL_LAPS)+'/'+TOTAL_LAPS, 30, 70);
+  ctx.fillText('TIME '+fmt(raceTime), 30, 96);
+  ctx.fillStyle='#9fd49f';
+  ctx.fillText('LAST '+fmt(p.lastLap), 30, 122);
+  ctx.fillText('BEST '+fmt(p.bestLap), 30, 148);
+  ctx.fillStyle='#ffd75e';
+  ctx.fillText('SPD  '+Math.round(p.speed*0.35)+' km/h', 30, 174-26+26);
+  // minimap
+  ctx.fillStyle='rgba(0,0,0,0.55)';
+  ctx.fillRect(MM.x,MM.y,MM.w,MM.h);
+  ctx.strokeStyle='rgba(255,255,255,0.25)';
+  ctx.strokeRect(MM.x,MM.y,MM.w,MM.h);
+  ctx.beginPath();
+  for(let i=0;i<N;i+=4){
+    const x=CENTER[i][0]*MM.s+MM.ox, y=CENTER[i][1]*MM.s+MM.oy;
+    if(i===0)ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.closePath();
+  ctx.strokeStyle='#8a93a3'; ctx.lineWidth=3; ctx.stroke();
+  for(const c of CARS){
+    ctx.fillStyle=c.isPlayer?'#ffffff':c.color;
+    ctx.beginPath();
+    ctx.arc(c.pos.x*MM.s+MM.ox, c.pos.y*MM.s+MM.oy, c.isPlayer?5:3.5, 0, 7);
+    ctx.fill();
+  }
+  // controls hint
+  ctx.font='13px monospace'; ctx.fillStyle='rgba(255,255,255,0.55)';
+  ctx.fillText('WASD / ARROWS drive  -  R restart  -  seed 0xC0FFEE', 30, H-18);
+  // countdown / GO
+  ctx.textAlign='center';
+  if(state==='countdown'){
+    ctx.font='bold 96px monospace'; ctx.fillStyle='#fff';
+    ctx.fillText(String(Math.ceil(countdown)), W/2, H/2);
+  }else if(state==='racing'&&raceTime<0.8){
+    ctx.font='bold 96px monospace'; ctx.fillStyle='#7dff7d';
+    ctx.fillText('GO!', W/2, H/2);
+  }
+  // finish overlay
+  if(state==='finished'){
+    ctx.fillStyle='rgba(0,0,0,0.65)';
+    ctx.fillRect(0,0,W,H);
+    ctx.font='bold 54px monospace'; ctx.fillStyle='#fff';
+    ctx.fillText('FINISH', W/2, 200);
+    ctx.font='20px monospace';
+    st.forEach((r,i)=>{
+      const c=r.c;
+      const line=(i+1)+'.  '+c.name.padEnd(8)+'  '+(c.finished? fmt(c.finishTime) : 'LAP '+Math.min(c.lap,TOTAL_LAPS)+'/'+TOTAL_LAPS);
+      ctx.fillStyle=c.isPlayer?'#7dff7d':'#cfd4dd';
+      ctx.fillText(line, W/2, 270+i*34);
+    });
+    ctx.font='15px monospace'; ctx.fillStyle='rgba(255,255,255,0.6)';
+    ctx.fillText('press R to race again (deterministic: same seed, same race)', W/2, 270+st.length*34+20);
+  }
+  ctx.textAlign='left';
+}
+function render(){
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle='#17301c';
+  ctx.fillRect(0,0,W,H);
+  ctx.save();
+  ctx.translate(W/2-cam.x, H/2-cam.y);
+  drawTrack();
+  for(const c of CARS) drawCar(c);
+  ctx.restore();
+  drawHUD();
+}
+
+/* ================= main loop: fixed timestep + accumulator ================= */
+let last=performance.now(), acc=0;
+function frame(now){
+  let el=(now-last)/1000; last=now;
+  if(el>0.25)el=0.25; // clamp after tab switch
+  acc+=el;
+  while(acc>=DT){ step(DT); acc-=DT; }
+  render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

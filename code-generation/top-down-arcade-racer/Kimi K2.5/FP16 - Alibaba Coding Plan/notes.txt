@@ -1,0 +1,5 @@
+- Developed using Roo Code Visual Studio Extension
+- This had fail originally due to tool calling errors with this model on the Alibaba Coding Plan, but they seem to have fixed it now
+- There were only a few errors while editing some files, but it recovered
+- It took its time but didn't do any of the extensive testing that the Kilo Code FP16 model did
+- The resulting game works and the controls are pretty ok, with working collision detection and it even implemented screen scrolling, but the AI is all over the place and doesn't drive inside the track limits. It implemented reverse correctly though

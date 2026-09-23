@@ -1,0 +1,3 @@
+- Developed with Roo Code
+- The game works, with decent rendering but very bad controls and physics/collision
+- It looks better than MiniMax M2.5 but the controls and physics/collision are worse

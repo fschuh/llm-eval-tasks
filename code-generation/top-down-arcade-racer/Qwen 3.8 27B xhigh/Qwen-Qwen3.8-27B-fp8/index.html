@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Top-Down Arcade Racer</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #101418; display: flex; align-items: center; justify-content: center; }
+  #wrap { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+  canvas { background: #22303a; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+  h1 { color: #cfd8e3; font: 15px monospace; margin: 0; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Top-Down Arcade Racer &mdash; Arrows/WASD to drive &middot; R to restart &middot; ?seed=N to change the RNG seed</h1>
+  <canvas id="game" width="960" height="600"></canvas>
+</div>
+<script src="racer.js"></script>
+</body>
+</html>

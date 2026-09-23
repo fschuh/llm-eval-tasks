@@ -1,0 +1,1095 @@
+Initializing game...
+Game started with seed: 613130
+Running in deterministic mode
+Game started successfully!
+Fixed timestep: 0.016666666666666666s
+Target FPS: 60
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+
+Rendering frame with interpolation: NaN
+
+=== HUD ===
+Lap: 0/4
+Time: 00:00.000
+Position: 1st
+Best Lap: N/A
+===============
+

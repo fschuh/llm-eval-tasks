@@ -1,0 +1,3 @@
+- Developed using Roo Code
+- The game is functional, the player car controls work but the track shape has a strange shape with some overlapping parts and the AI is completely broken
+- This is the first local Qwen 3/3.x series model I tested that was able to create a runnable game without errors though

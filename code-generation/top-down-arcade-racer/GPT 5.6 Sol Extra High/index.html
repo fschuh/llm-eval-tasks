@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d1d25" />
+    <title>Slipstream Circuit</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <span class="brand-mark" aria-hidden="true">S</span>
+          <div>
+            <p class="eyebrow">ARCADE RACING DIVISION</p>
+            <h1>SLIPSTREAM <span>CIRCUIT</span></h1>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span class="seed-tag">SEED <b>C0FFEE</b></span>
+          <button id="soundButton" class="icon-button" type="button" aria-label="Toggle sound" title="Toggle sound">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Zm12.6-.9a5 5 0 0 1 0 7.8M19 5a9 9 0 0 1 0 14"/></svg>
+          </button>
+          <button id="pauseButton" class="icon-button" type="button" aria-label="Pause race" title="Pause race (P)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14M17 5v14"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <section class="game-frame" aria-label="Slipstream Circuit racing game">
+        <canvas id="gameCanvas" tabindex="0" aria-label="Top-down racing game canvas"></canvas>
+
+        <div class="hud" aria-hidden="true">
+          <div class="hud-card lap-card">
+            <span class="hud-label">LAP</span>
+            <div class="hud-value"><b id="lapValue">1</b><small>/ 3</small></div>
+            <div class="lap-dots"><i class="active"></i><i></i><i></i></div>
+          </div>
+
+          <div class="hud-card timer-card">
+            <span class="hud-label">RACE TIME</span>
+            <div id="timeValue" class="timer-value">00:00.000</div>
+            <div class="best-time"><span>BEST LAP</span><b id="bestLapValue">--:--.---</b></div>
+          </div>
+
+          <div class="hud-card position-card">
+            <span class="hud-label">POSITION</span>
+            <div class="position-value"><b id="positionValue">1</b><small>/ 4</small></div>
+            <span id="positionSuffix" class="position-suffix">ST</span>
+          </div>
+        </div>
+
+        <div id="messageOverlay" class="message-overlay" aria-live="polite">
+          <p id="messageKicker">GET READY</p>
+          <strong id="messageValue">3</strong>
+          <span id="messageDetail">Three laps. Leave nothing on the tarmac.</span>
+          <button id="restartButton" class="restart-button" type="button">RACE AGAIN <kbd>R</kbd></button>
+        </div>
+
+        <div class="minimap-key" aria-hidden="true">
+          <i></i><span>YOU</span>
+        </div>
+
+        <div class="touch-controls" aria-label="Touch driving controls">
+          <div class="touch-steer">
+            <button data-control="left" aria-label="Steer left">←</button>
+            <button data-control="right" aria-label="Steer right">→</button>
+          </div>
+          <div class="touch-pedals">
+            <button class="brake" data-control="brake" aria-label="Brake">BRAKE</button>
+            <button class="throttle" data-control="throttle" aria-label="Accelerate">GO</button>
+          </div>
+        </div>
+      </section>
+
+      <footer class="control-bar">
+        <div class="controls-group">
+          <span class="control-label">STEER</span>
+          <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>
+          <span class="or">or</span>
+          <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>
+        </div>
+        <div class="controls-group secondary">
+          <span><kbd>SPACE</kbd> Handbrake</span>
+          <span><kbd>P</kbd> Pause</span>
+          <span><kbd>R</kbd> Restart</span>
+        </div>
+        <p class="fixed-step">120 HZ FIXED SIM <i></i> NO ASSISTS</p>
+      </footer>
+    </main>
+
+    <script src="game.js"></script>
+  </body>
+</html>

@@ -1,0 +1,1 @@
+Write a JS program that shows multiple balls bouncing inside a spinning hexagon. The balls should be affected by gravity and friction, and they must bounce off the rotating walls and off each other realistically.

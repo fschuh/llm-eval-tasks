@@ -1,0 +1,3 @@
+- Developed using Codex extension in Visual Studio Codex
+- This is the first model that actually implemented reverse controls that behave like an actual car (i.e. turn according to the direction the tires are facing)
+- The AI is pretty bad though

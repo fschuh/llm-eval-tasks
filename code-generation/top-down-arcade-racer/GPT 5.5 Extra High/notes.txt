@@ -1,0 +1,3 @@
+- Developed using Codex Visual Studio extension
+- The resulting was basically flawless and checked all the boxes: good controls (even reverse is correct), lap counting works, current position works, AI is decent, physics is good and the race even ends when we complete all laps. Impressive.
+- The only issue is the last AI car never stops racing on the track even though the race has already ended

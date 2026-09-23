@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Top-Down Racer - prototype</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #10141a; display: flex; align-items: center; justify-content: center; font-family: monospace; }
+  canvas { background: #26361f; }
+</style>
+</head>
+<body>
+<canvas id="view" width="1000" height="700"></canvas>
+<script src="sim.js"></script>
+<script>
+"use strict";
+const SEED = 1337;
+const canvas = document.getElementById("view");
+const ctx = canvas.getContext("2d");
+const W = canvas.width, H = canvas.height;
+const DT = RacingSim.DT;
+const LAPS = RacingSim.TOTAL_LAPS;
+
+let sim = RacingSim.createSim(SEED);
+let trackPath = null;
+
+const keys = { up: false, down: false, left: false, right: false };
+const KEYMAP = {
+  ArrowUp: "up", KeyW: "up",
+  ArrowDown: "down", KeyS: "down",
+  ArrowLeft: "left", KeyA: "left",
+  ArrowRight: "right", KeyD: "right",
+};
+window.addEventListener("keydown", (e) => {
+  if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = true; e.preventDefault(); }
+  if (e.code === "KeyR") { sim = RacingSim.createSim(SEED); trackPath = null; }
+});
+window.addEventListener("keyup", (e) => {
+  if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false;
+});
+window.addEventListener("blur", () => { keys.up = keys.down = keys.left = keys.right = false; });
+
+// Fixed timestep with accumulator: physics always advances in DT increments,
+// independent of display refresh rate.
+let acc = 0, last = performance.now();
+function frame(now) {
+  let dt = (now - last) / 1000;
+  last = now;
+  if (dt > 0.25) dt = 0.25;
+  acc += dt;
+  while (acc >= DT) {
+    sim.playerInput = {
+      throttle: keys.up ? 1 : 0,
+      brake: keys.down ? 1 : 0,
+      steer: (keys.left ? -1 : 0) + (keys.right ? 1 : 0),
+    };
+    sim.step(DT);
+    acc -= DT;
+  }
+  render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+function fmtTime(t) {
+  const m = Math.floor(t / 60);
+  const s = Math.floor(t % 60);
+  const cs = Math.floor((t * 100) % 100);
+  return m + ":" + String(s).padStart(2, "0") + "." + String(cs).padStart(2, "0");
+}
+
+function getTrackPath() {
+  if (!trackPath) {
+    trackPath = new Path2D();
+    const pts = sim.track.pts;
+    trackPath.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) trackPath.lineTo(pts[i].x, pts[i].y);
+    trackPath.closePath();
+  }
+  return trackPath;
+}
+
+function panel(x, y, w, h) {
+  ctx.fillStyle = "rgba(10, 14, 18, 0.72)";
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+}
+
+function text(str, x, y, size, color) {
+  ctx.font = size + "px monospace";
+  ctx.textAlign = "left";
+  ctx.fillStyle = color || "#e8edf2";
+  ctx.fillText(str, x, y);
+}
+
+function drawTrack() {
+  const path = getTrackPath();
+  const hw = sim.track.halfWidth;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "#59616c";
+  ctx.lineWidth = hw * 2 + 10;
+  ctx.stroke(path);
+  ctx.strokeStyle = "#3a4048";
+  ctx.lineWidth = hw * 2;
+  ctx.stroke(path);
+  ctx.strokeStyle = "#98a1ac";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([16, 20]);
+  ctx.stroke(path);
+  ctx.setLineDash([]);
+  const p = sim.track.pts[0];
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(Math.atan2(p.ty, p.tx));
+  const sq = 10;
+  const cols = Math.ceil((hw * 2) / sq);
+  for (let r = 0; r < 2; r++) {
+    for (let c = 0; c < cols; c++) {
+      ctx.fillStyle = (r + c) % 2 ? "#15181c" : "#e8edf2";
+      ctx.fillRect(-sq + r * sq, -hw + c * sq, sq, sq);
+    }
+  }
+  ctx.restore();
+}
+
+function drawCar(car) {
+  ctx.save();
+  ctx.translate(car.x, car.y);
+  ctx.rotate(car.heading);
+  ctx.fillStyle = car.color;
+  ctx.fillRect(-17, -10, 34, 20);
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fillRect(-8, -7, 12, 14);
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.moveTo(17, 0);
+  ctx.lineTo(10, -5);
+  ctx.lineTo(10, 5);
+  ctx.closePath();
+  ctx.fill();
+  if (car.isPlayer) {
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-17, -10, 34, 20);
+  }
+  ctx.restore();
+  ctx.font = "12px monospace";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
+  ctx.fillText(car.name, car.x, car.y - 18);
+}
+
+function drawHUD() {
+  const player = sim.cars[0];
+  const pos = sim.positions.indexOf(0) + 1;
+  const speed = Math.round(Math.hypot(player.vx, player.vy) * 0.5);
+  panel(12, 12, 190, 118);
+  text("LAP  " + Math.min(player.lap, LAPS) + "/" + LAPS, 24, 40, 16);
+  text("TIME " + fmtTime(sim.raceTime), 24, 64, 16);
+  text("POS  " + pos + "/" + sim.cars.length, 24, 88, 16);
+  text("SPD  " + speed, 24, 112, 16);
+
+  panel(W - 212, 12, 200, 112);
+  text("STANDINGS", W - 200, 34, 13, "#9aa4ae");
+  sim.positions.forEach((ci, rank) => {
+    const c = sim.cars[ci];
+    const lapTxt = c.finished ? "FIN" : "L" + Math.min(c.lap, LAPS);
+    text((rank + 1) + ". " + c.name + "  " + lapTxt, W - 200, 56 + rank * 18, 13, c.color);
+  });
+
+  text("WASD/arrows drive - R restart - seed " + SEED, 12, H - 14, 12, "#9aa4ae");
+}
+
+function drawMinimap() {
+  const mw = 170, mh = 130;
+  const mx = W - mw - 14, my = H - mh - 14;
+  panel(mx, my, mw, mh);
+  const pts = sim.track.pts;
+  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+  for (const p of pts) {
+    if (p.x < minx) minx = p.x;
+    if (p.x > maxx) maxx = p.x;
+    if (p.y < miny) miny = p.y;
+    if (p.y > maxy) maxy = p.y;
+  }
+  const s = Math.min((mw - 28) / (maxx - minx), (mh - 28) / (maxy - miny));
+  ctx.save();
+  ctx.translate(mx + 14, my + 14);
+  ctx.scale(s, s);
+  ctx.translate(-minx, -miny);
+  ctx.strokeStyle = "rgba(255,255,255,0.45)";
+  ctx.lineWidth = 10 / s;
+  ctx.lineJoin = "round";
+  ctx.stroke(getTrackPath());
+  for (const c of sim.cars) {
+    ctx.fillStyle = c.color;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 7 / s, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function big(str) {
+  ctx.font = "bold 64px monospace";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(str, W / 2, H / 2 - 40);
+}
+
+function drawCenterMessage() {
+  if (sim.phase === "countdown") {
+    big(String(Math.max(1, Math.ceil(sim.countdown))));
+  } else if (sim.phase === "racing" && sim.raceTime < 1.2) {
+    big("GO!");
+  } else if (sim.phase === "finished") {
+    const pos = sim.positions.indexOf(0) + 1;
+    big("FINISHED  P" + pos);
+    ctx.font = "14px monospace";
+    ctx.textAlign = "center";
+    sim.positions.forEach((ci, r) => {
+      const c = sim.cars[ci];
+      ctx.fillStyle = c.color;
+      ctx.fillText((r + 1) + ". " + c.name + "  " + (c.finished ? fmtTime(c.finishTime) : "DNF"), W / 2, H / 2 + 20 + r * 20);
+    });
+    ctx.fillStyle = "#9aa4ae";
+    ctx.fillText("press R to restart", W / 2, H / 2 + 110);
+  }
+}
+
+function render() {
+  const player = sim.cars[0];
+  const zoom = 1.15;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#26361f";
+  ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  ctx.translate(W / 2, H / 2);
+  ctx.scale(zoom, zoom);
+  ctx.translate(-player.x, -player.y);
+  drawTrack();
+  for (const car of sim.cars) drawCar(car);
+  ctx.restore();
+  drawHUD();
+  drawMinimap();
+  drawCenterMessage();
+}
+</script>
+</body>
+</html>

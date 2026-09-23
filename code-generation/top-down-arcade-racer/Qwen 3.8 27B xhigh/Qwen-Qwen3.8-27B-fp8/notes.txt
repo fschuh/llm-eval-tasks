@@ -1,0 +1,12 @@
+- NOTE: did not complete the task after initial prompt
+    - The agent output was cut off during reasoning an stopped
+    - I had to send another "continue" prompt for it to finish the task
+    - Probably a bug in the vLLM setup for this model
+- Implemented using OpenCode
+- Game is functional
+- The controls and collision physics are decent
+- Car reverse is correct
+- AI partially broken: gets a little crazy at the beginning of the race and spins around before it starts actually moving forward
+- Race standings don't work
+- Lap counter is weird, need to do several laps to count as one
+- The race ends after completing all laps

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top-Down 2D Racing Prototype</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="countdown-overlay" class="hidden">
+            <span id="countdown-text">3</span>
+        </div>
+        <div id="finish-overlay" class="hidden">
+            <h1>Race Complete!</h1>
+            <p id="finish-position"></p>
+            <p id="finish-time"></p>
+            <button id="restart-btn">Restart Race</button>
+        </div>
+    </div>
+    
+    <div id="instructions">
+        <h3>Controls</h3>
+        <p>↑ Accelerate | ↓ Brake/Reverse</p>
+        <p>← Steer Left | → Steer Right</p>
+        <p>R - Restart Race</p>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

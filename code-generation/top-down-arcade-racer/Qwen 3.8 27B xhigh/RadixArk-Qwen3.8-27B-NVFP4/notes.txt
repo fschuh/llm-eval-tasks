@@ -1,0 +1,12 @@
+- Implemented in OpenCode
+- It only generated a single racer.js file and no index.html of any sort so it was not runnable on the browser by default
+- After asking it for the command for a Python http server to test it, it generated the index.html file
+- The game is functional
+- Very different output from the int4 quant
+- The track still has a rather interesting shape and fits on the screen (though a small edge of it is cropepd off my browser window)
+- The cars drive really fast and feel a bit like they're sliding when turning
+- Collision works ok
+- Car reverse is correct but very slow
+- The AI slows down and stop to avoid hitting the player which was interesting
+- The race standings are all over the place and never seem to be correct
+- The race doesn't end after completing the last lap

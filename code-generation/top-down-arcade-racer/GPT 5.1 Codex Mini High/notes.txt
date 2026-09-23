@@ -1,0 +1,2 @@
+- Developed using the Codex extension in Visual Studio Codex
+- The resulting game runs without any errors, with wonky controls and physics but at least it runs

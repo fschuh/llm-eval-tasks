@@ -1,0 +1,15 @@
+- Implemented in Claude Code
+- The game is functional
+- Nice visuals, the track has zebras around the corners and is surrounded by grass
+- There's a mini-map showing the track and the car positions in it
+- The track has dirt section spanning each side, and if the car runs into it it leaves trails of dirt smoke
+- The cars leave permanent skid marks on the track
+- There are two camera options: fixed rotation or follow the rotation of the car
+- The controls and physics response and collision are good, but the physics are very unrealistic. 
+- Cars lose track adherence at higher speeds which leads to a lot of sliding and it's very difficult to recover control.
+- There's a handbrake, but it feels like the car is sliding on ice
+- There's a screen shake effect when crashing hard into walls or cars
+- Car reversing is correct
+- The race ends after completing the last lap
+- The player's car accelerates much slower than the AI cars, which makes it impossible to win the race
+- I couldn't verify if the race standings work, because the player's car is always in last place due to it being slower than everybody else

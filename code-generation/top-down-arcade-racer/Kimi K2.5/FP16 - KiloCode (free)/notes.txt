@@ -1,0 +1,6 @@
+- Developed using Kilo Code
+- Initially tried using Alibaba Coding Plan but its Kimi K2.5 model is failing to perform some tool calls, which made the task impossible to complete. Similar behavior as Nvidia NIM's Kimi K2.5
+- The Free Kimi K2.5 in Kilo Code performed really well, with very rare tool call failures and generated tokens vfery quickly
+- It went as far as running a web server, launching a browser and taking screenshots to verify that the game was running
+- It took quite long to finish the implementation compared to models like MiniMax M2.5 and GLM 5
+- The resulting game has wonky physics and controls but is somewhat functional, and the collision system is not bad. It even implemented reverse correctly

@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top-Down Racer</title>
+    <style>
+        /* CSS Reset and Base Styles */
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+        
+        body {
+            background: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        
+        /* Canvas Styles */
+        #gameCanvas {
+            display: block;
+            background: #2d5016;
+            border: 4px solid #333;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        
+        /* UI Overlay Styles */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <script>
+        // ============================================
+        // SECTION 1: CONSTANTS AND CONFIGURATION
+        // ============================================
+        const CONFIG = {
+            FIXED_TIMESTEP: 1 / 60,           // 60 Hz physics update
+            MAX_FRAME_TIME: 0.25,             // Prevent spiral of death
+            GAME_SEED: 12345,                 // Fixed seed for reproducibility
+            TOTAL_LAPS: 3,                    // Race length
+            CANVAS_WIDTH: 800,
+            CANVAS_HEIGHT: 600,
+        };
+
+        const PHYSICS = {
+            // Car properties
+            CAR_WIDTH: 40,
+            CAR_HEIGHT: 20,
+            CAR_MASS: 1000,                   // Arbitrary units
+            CAR_COLLISION_RADIUS: 25,
+            
+            // Movement
+            MAX_SPEED: 300,                   // pixels/second
+            MAX_REVERSE_SPEED: -100,
+            ACCELERATION: 200,                // pixels/second²
+            BRAKE_FORCE: 400,
+            FRICTION: 50,                     // drag coefficient
+            
+            // Steering
+            TURN_SPEED: 3.0,                  // radians/second at max speed
+            MIN_TURN_MULTIPLIER: 0.3,         // minimum turn speed when stationary
+            
+            // Collision
+            RESTITUTION: 0.5,                 // bounciness
+            POSITIONAL_CORRECTION: 0.8,       // 80% position correction
+        };
+
+        // ============================================
+        // SECTION 2: UTILITIES
+        // ============================================
+        
+        // 2.1 Seeded Random Number Generator (Mulberry32)
+        class SeededRandom {
+            constructor(seed) {
+                this.seed = seed >>> 0;  // Ensure unsigned 32-bit
+                this.initialSeed = this.seed;
+            }
+            
+            // Mulberry32 algorithm - fast, high-quality PRNG
+            next() {
+                let t = this.seed += 0x6D2B79F5;
+                t = Math.imul(t ^ t >>> 15, t | 1);
+                t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            }
+            
+            // Random float in range [min, max)
+            range(min, max) {
+                return min + this.next() * (max - min);
+            }
+            
+            // Random integer in range [min, max]
+            intRange(min, max) {
+                return Math.floor(this.range(min, max + 1));
+            }
+            
+            // Random boolean
+            boolean() {
+                return this.next() < 0.5;
+            }
+            
+            // Reset to original seed
+            reset() {
+                this.seed = this.initialSeed >>> 0;
+            }
+        }
+
+        // 2.2 Math Utilities
+        const MathUtils = {
+            normalizeAngle: (angle) => {
+                while (angle > Math.PI) angle -= 2 * Math.PI;
+                while (angle < -Math.PI) angle += 2 * Math.PI;
+                return angle;
+            },
+            
+            clamp: (value, min, max) => {
+                return Math.max(min, Math.min(max, value));
+            },
+            
+            lerp: (a, b, t) => {
+                return a + (b - a) * t;
+            },
+            
+            // Distance between two points
+            distance: (x1, y1, x2, y2) => {
+                return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+            },
+            
+            // Closest point on line segment
+            closestPointOnSegment: (px, py, x1, y1, x2, y2) => {
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const t = Math.max(0, Math.min(1, 
+                    ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)
+                ));
+                return { x: x1 + t * dx, y: y1 + t * dy };
+            }
+        };
+
+        // Global RNG instance
+        let rng;
+
+        // ============================================
+        // SECTION 3: INPUT HANDLING
+        // ============================================
+        class InputHandler {
+            constructor() {
+                this.keys = {};
+                this.startPressed = false;
+                
+                window.addEventListener('keydown', (e) => {
+                    this.keys[e.code] = true;
+                    if (e.code === 'Space' || e.code === 'Enter') {
+                        this.startPressed = true;
+                    }
+                });
+                
+                window.addEventListener('keyup', (e) => {
+                    this.keys[e.code] = false;
+                    if (e.code === 'Space' || e.code === 'Enter') {
+                        this.startPressed = false;
+                    }
+                });
+            }
+            
+            // Get throttle input (0 to 1)
+            getThrottle() {
+                return (this.keys['ArrowUp'] || this.keys['KeyW']) ? 1 : 0;
+            }
+            
+            // Get brake input (0 to 1)
+            getBrake() {
+                return (this.keys['ArrowDown'] || this.keys['KeyS']) ? 1 : 0;
+            }
+            
+            // Get steering input (-1 to 1)
+            getSteerInput() {
+                if (this.keys['ArrowLeft'] || this.keys['KeyA']) {
+                    return -1;
+                } else if (this.keys['ArrowRight'] || this.keys['KeyD']) {
+                    return 1;
+                }
+                return 0;
+            }
+            
+            reset() {
+                this.startPressed = false;
+            }
+        }
+
+        // ============================================
+        // SECTION 4: PHYSICS CLASSES
+        // ============================================
+        
+        // 4.1 Base Car Class
+        class Car {
+            constructor(x, y, angle, color) {
+                // Position
+                this.x = x;
+                this.y = y;
+                
+                // Orientation
+                this.angle = angle;           // Radians, 0 = facing right
+                this.angularVelocity = 0;
+                
+                // Velocity (world space)
+                this.velocityX = 0;
+                this.velocityY = 0;
+                
+                // Car dimensions
+                this.width = PHYSICS.CAR_WIDTH;
+                this.height = PHYSICS.CAR_HEIGHT;
+                this.collisionRadius = PHYSICS.CAR_COLLISION_RADIUS;
+                this.mass = PHYSICS.CAR_MASS;
+                
+                // Physics properties
+                this.maxSpeed = PHYSICS.MAX_SPEED;
+                this.maxReverseSpeed = PHYSICS.MAX_REVERSE_SPEED;
+                this.acceleration = PHYSICS.ACCELERATION;
+                this.brakeForce = PHYSICS.BRAKE_FORCE;
+                this.friction = PHYSICS.FRICTION;
+                this.turnSpeed = PHYSICS.TURN_SPEED;
+                this.minTurnSpeedMultiplier = PHYSICS.MIN_TURN_MULTIPLIER;
+                
+                // Visual properties
+                this.color = color;
+                
+                // Previous state for interpolation
+                this.prevX = x;
+                this.prevY = y;
+                this.prevAngle = angle;
+                
+                // Lap tracking
+                this.currentWaypointIndex = 0;
+                this.lapCounter = null;
+            }
+            
+            // Store previous state for interpolation
+            storePreviousState() {
+                this.prevX = this.x;
+                this.prevY = this.y;
+                this.prevAngle = this.angle;
+            }
+            
+            // Get signed speed (positive = forward, negative = reverse)
+            getSignedSpeed() {
+                const forwardX = Math.cos(this.angle);
+                const forwardY = Math.sin(this.angle);
+                return this.velocityX * forwardX + this.velocityY * forwardY;
+            }
+            
+            // Physics update
+            update(dt) {
+                this.storePreviousState();
+                
+                // 1. Calculate speed from velocity vector
+                const speed = Math.sqrt(this.velocityX ** 2 + this.velocityY ** 2);
+                const currentSpeed = this.getSignedSpeed();
+                
+                // 2. Apply throttle/brake forces (in car's forward direction)
+                const forwardX = Math.cos(this.angle);
+                const forwardY = Math.sin(this.angle);
+                
+                if (this.throttle > 0) {
+                    // Acceleration
+                    this.velocityX += forwardX * this.acceleration * this.throttle * dt;
+                    this.velocityY += forwardY * this.acceleration * this.throttle * dt;
+                }
+                
+                if (this.brake > 0) {
+                    // Braking (opposite to current direction)
+                    if (currentSpeed > 0) {
+                        this.velocityX -= forwardX * this.brakeForce * this.brake * dt;
+                        this.velocityY -= forwardY * this.brakeForce * this.brake * dt;
+                    } else {
+                        // Reverse acceleration when braking while stopped
+                        this.velocityX -= forwardX * this.acceleration * 0.5 * this.brake * dt;
+                        this.velocityY -= forwardY * this.acceleration * 0.5 * this.brake * dt;
+                    }
+                }
+                
+                // 3. Apply friction (linear drag)
+                this.velocityX -= this.velocityX * this.friction * dt;
+                this.velocityY -= this.velocityY * this.friction * dt;
+                
+                // 4. Clamp speed to maximum
+                const newSpeed = Math.sqrt(this.velocityX ** 2 + this.velocityY ** 2);
+                if (newSpeed > this.maxSpeed) {
+                    const scale = this.maxSpeed / newSpeed;
+                    this.velocityX *= scale;
+                    this.velocityY *= scale;
+                }
+                if (newSpeed < this.maxReverseSpeed) {
+                    const scale = this.maxReverseSpeed / newSpeed;
+                    this.velocityX *= scale;
+                    this.velocityY *= scale;
+                }
+                
+                // 5. Steering (only when moving)
+                const speedFactor = Math.max(this.minTurnSpeedMultiplier, 
+                                            Math.abs(currentSpeed) / this.maxSpeed);
+                const turnAmount = this.steerInput * this.turnSpeed * speedFactor * dt;
+                
+                // Reverse steering when going backward for natural feel
+                const directionMultiplier = currentSpeed >= 0 ? 1 : -1;
+                this.angle += turnAmount * directionMultiplier;
+                
+                // 6. Update position
+                this.x += this.velocityX * dt;
+                this.y += this.velocityY * dt;
+                
+                // 7. Keep angle normalized
+                this.angle = MathUtils.normalizeAngle(this.angle);
+            }
+            
+            // Get interpolated position for rendering
+            getInterpolatedX(alpha) {
+                return MathUtils.lerp(this.prevX, this.x, alpha);
+            }
+            
+            getInterpolatedY(alpha) {
+                return MathUtils.lerp(this.prevY, this.y, alpha);
+            }
+            
+            getInterpolatedAngle(alpha) {
+                return MathUtils.lerp(this.prevAngle, this.angle, alpha);
+            }
+        }
+        
+        // 4.2 Player Car (extends Car)
+        class PlayerCar extends Car {
+            constructor(x, y, angle) {
+                super(x, y, angle, '#ff3333');  // Red player car
+                this.throttle = 0;
+                this.brake = 0;
+                this.steerInput = 0;
+            }
+            
+            handleInput(input) {
+                this.throttle = input.getThrottle();
+                this.brake = input.getBrake();
+                this.steerInput = input.getSteerInput();
+            }
+        }
+        
+        // 4.3 AI Opponent (extends Car)
+        class AIOpponent extends Car {
+            constructor(x, y, angle, difficulty, waypointIndex, color) {
+                super(x, y, angle, color);
+                
+                this.currentWaypointIndex = waypointIndex;
+                this.difficulty = difficulty;  // 0.0 to 1.0
+                
+                // AI-specific properties based on difficulty
+                this.reactionTime = 0.1 + (1 - difficulty) * 0.2;  // Faster reaction = harder
+                this.steeringError = (1 - difficulty) * 0.3;       // More error = easier
+                this.targetSpeedMultiplier = 0.8 + difficulty * 0.2;
+                
+                // State
+                this.throttle = 0;
+                this.brake = 0;
+                this.steerInput = 0;
+                this.steerTimer = 0;
+            }
+            
+            updateAI(dt, waypoints) {
+                const currentWaypoint = waypoints[this.currentWaypointIndex];
+                
+                // 1. Calculate direction to waypoint
+                const dx = currentWaypoint.x - this.x;
+                const dy = currentWaypoint.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // 2. Check if waypoint reached
+                if (distance < currentWaypoint.radius) {
+                    this.currentWaypointIndex = (this.currentWaypointIndex + 1) % waypoints.length;
+                    return;
+                }
+                
+                // 3. Calculate desired angle to waypoint
+                const desiredAngle = Math.atan2(dy, dx);
+                
+                // 4. Calculate angle difference
+                let angleDiff = MathUtils.normalizeAngle(desiredAngle - this.angle);
+                
+                // 5. Add steering error based on difficulty
+                angleDiff += (Math.random() - 0.5) * this.steeringError;
+                
+                // 6. Determine steering input (-1 to 1)
+                const steerStrength = Math.PI / 4;  // Dead zone
+                if (angleDiff > steerStrength) {
+                    this.steerInput = MathUtils.clamp(angleDiff / steerStrength, -1, 1);
+                } else if (angleDiff < -steerStrength) {
+                    this.steerInput = MathUtils.clamp(angleDiff / steerStrength, -1, 1);
+                } else {
+                    this.steerInput = 0;
+                }
+                
+                // 7. Determine throttle/brake based on waypoint speed and distance
+                const targetSpeed = currentWaypoint.speed * this.targetSpeedMultiplier;
+                const currentSpeed = this.getSignedSpeed();
+                
+                if (currentSpeed < targetSpeed) {
+                    this.throttle = MathUtils.clamp((targetSpeed - currentSpeed) / 100, 0, 1);
+                    this.brake = 0;
+                } else {
+                    this.throttle = 0;
+                    this.brake = MathUtils.clamp((currentSpeed - targetSpeed) / 100, 0, 1);
+                }
+                
+                // 8. Look ahead for upcoming waypoints (advanced AI)
+                if (this.difficulty > 0.7) {
+                    const nextWaypoint = waypoints[
+                        (this.currentWaypointIndex + 1) % waypoints.length
+                    ];
+                    const distToNext = Math.hypot(nextWaypoint.x - this.x, nextWaypoint.y - this.y);
+                    
+                    // Start turning early for sharp turns
+                    if (distToNext < 150) {
+                        this.throttle *= 0.7;  // Slow down approaching turn
+                    }
+                }
+            }
+        }
+
+        // 4.4 Collision Detection and Resolution
+        const Collision = {
+            // Check collision between two cars
+            checkCircleCollision: (car1, car2) => {
+                const dx = car2.x - car1.x;
+                const dy = car2.y - car1.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const minDistance = car1.collisionRadius + car2.collisionRadius;
+                
+                return {
+                    colliding: distance < minDistance,
+                    distance: distance,
+                    minDistance: minDistance,
+                    overlap: minDistance - distance,
+                    normalX: distance > 0 ? dx / distance : 1,
+                    normalY: distance > 0 ? dy / distance : 0
+                };
+            },
+            
+            // Resolve collision between two cars using impulse
+            resolveCollision: (car1, car2, collisionInfo) => {
+                if (!collisionInfo.colliding) return;
+                
+                const { overlap, normalX, normalY } = collisionInfo;
+                
+                // 1. Positional correction (prevent sinking)
+                const correctionPercent = PHYSICS.POSITIONAL_CORRECTION;
+                const totalMass = car1.mass + car2.mass;
+                const m1Ratio = car2.mass / totalMass;
+                const m2Ratio = car1.mass / totalMass;
+                
+                car1.x -= normalX * overlap * m1Ratio * correctionPercent;
+                car1.y -= normalY * overlap * m1Ratio * correctionPercent;
+                car2.x += normalX * overlap * m2Ratio * correctionPercent;
+                car2.y += normalY * overlap * m2Ratio * correctionPercent;
+                
+                // 2. Calculate relative velocity
+                const relVelX = car2.velocityX - car1.velocityX;
+                const relVelY = car2.velocityY - car1.velocityY;
+                
+                // 3. Relative velocity along collision normal
+                const velAlongNormal = relVelX * normalX + relVelY * normalY;
+                
+                // 4. Do not resolve if velocities are separating
+                if (velAlongNormal > 0) return;
+                
+                // 5. Calculate impulse scalar
+                const restitution = PHYSICS.RESTITUTION;
+                
+                let impulseScalar = -(1 + restitution) * velAlongNormal;
+                impulseScalar /= (1 / car1.mass + 1 / car2.mass);
+                
+                // 6. Apply impulse
+                const impulseX = impulseScalar * normalX;
+                const impulseY = impulseScalar * normalY;
+                
+                car1.velocityX -= impulseX / car1.mass;
+                car1.velocityY -= impulseY / car1.mass;
+                car2.velocityX += impulseX / car2.mass;
+                car2.velocityY += impulseY / car2.mass;
+                
+                // 7. Apply angular impulse (simplified - causes spin on impact)
+                const tangentX = -normalY;
+                const tangentY = normalX;
+                const tangentVel = relVelX * tangentX + relVelY * tangentY;
+                
+                car1.angularVelocity -= tangentVel * 0.01;
+                car2.angularVelocity += tangentVel * 0.01;
+            },
+            
+            // Check track boundary collision
+            checkTrackBoundaryCollision: (car, trackBoundaries) => {
+                for (const segment of trackBoundaries) {
+                    const closest = MathUtils.closestPointOnSegment(
+                        car.x, car.y,
+                        segment.x1, segment.y1,
+                        segment.x2, segment.y2
+                    );
+                    
+                    const dx = car.x - closest.x;
+                    const dy = car.y - closest.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < car.collisionRadius) {
+                        return {
+                            colliding: true,
+                            overlap: car.collisionRadius - distance,
+                            normalX: dx / distance,
+                            normalY: dy / distance
+                        };
+                    }
+                }
+                return { colliding: false };
+            },
+            
+            // Resolve wall collision
+            resolveWallCollision: (car, collisionInfo) => {
+                if (!collisionInfo.colliding) return;
+                
+                const { overlap, normalX, normalY } = collisionInfo;
+                
+                // Positional correction
+                car.x += normalX * overlap * PHYSICS.POSITIONAL_CORRECTION;
+                car.y += normalY * overlap * PHYSICS.POSITIONAL_CORRECTION;
+                
+                // Reflect velocity
+                const dotProduct = car.velocityX * normalX + car.velocityY * normalY;
+                car.velocityX -= 2 * dotProduct * normalX * PHYSICS.RESTITUTION;
+                car.velocityY -= 2 * dotProduct * normalY * PHYSICS.RESTITUTION;
+                
+                // Apply friction
+                car.velocityX *= 0.9;
+                car.velocityY *= 0.9;
+            }
+        };
+
+        // ============================================
+        // SECTION 5: TRACK AND WAYPOINTS
+        // ============================================
+        
+        // Oval track waypoints for AI navigation
+        const trackWaypoints = [
+            { x: 150, y: 150, radius: 80, speed: 200 },
+            { x: 400, y: 150, radius: 80, speed: 250 },
+            { x: 650, y: 200, radius: 100, speed: 180 },
+            { x: 650, y: 400, radius: 100, speed: 180 },
+            { x: 400, y: 450, radius: 80, speed: 250 },
+            { x: 150, y: 450, radius: 80, speed: 200 },
+        ];
+        
+        // Track boundaries for wall collision (inner and outer)
+        const trackBoundaries = [
+            // Inner boundary (clockwise)
+            { x1: 200, y1: 200, x2: 350, y2: 200 },
+            { x1: 350, y1: 200, x2: 500, y2: 250 },
+            { x1: 500, y1: 250, x2: 500, y2: 350 },
+            { x1: 500, y1: 350, x2: 350, y2: 400 },
+            { x1: 350, y1: 400, x2: 200, y2: 400 },
+            { x1: 200, y1: 400, x2: 150, y2: 300 },
+            { x1: 150, y1: 300, x2: 200, y2: 200 },
+            
+            // Outer boundary (clockwise)
+            { x1: 100, y1: 100, x2: 450, y2: 100 },
+            { x1: 450, y1: 100, x2: 700, y2: 150 },
+            { x1: 700, y1: 150, x2: 700, y2: 450 },
+            { x1: 700, y1: 450, x2: 450, y2: 500 },
+            { x1: 450, y1: 500, x2: 100, y2: 500 },
+            { x1: 100, y1: 500, x2: 50, y2: 300 },
+            { x1: 50, y1: 300, x2: 100, y2: 100 },
+        ];
+        
+        // Start/finish line
+        const startLine = {
+            x: 150,
+            y: 130,
+            width: 10,
+            height: 40,
+            normalX: 1,
+            normalY: 0
+        };
+        
+        // Track rendering data
+        const track = {
+            innerPath: [
+                { x: 200, y: 200 },
+                { x: 350, y: 200 },
+                { x: 500, y: 250 },
+                { x: 500, y: 350 },
+                { x: 350, y: 400 },
+                { x: 200, y: 400 },
+                { x: 150, y: 300 },
+            ],
+            outerPath: [
+                { x: 100, y: 100 },
+                { x: 450, y: 100 },
+                { x: 700, y: 150 },
+                { x: 700, y: 450 },
+                { x: 450, y: 500 },
+                { x: 100, y: 500 },
+                { x: 50, y: 300 },
+            ]
+        };
+
+        // ============================================
+        // SECTION 6: LAP DETECTION
+        // ============================================
+        class LapCounter {
+            constructor(totalLaps = CONFIG.TOTAL_LAPS) {
+                this.totalLaps = totalLaps;
+                this.currentLap = 0;
+                this.checkpointsPassed = 0;
+                this.totalCheckpoints = Math.floor(trackWaypoints.length / 2);
+                this.finished = false;
+                this.lapStartTime = 0;
+                this.totalRaceTime = 0;
+                this.lapTimes = [];
+                this.checkpointReached = false;
+            }
+            
+            update(car, deltaTime) {
+                if (this.finished) return;
+                
+                const currentWaypointIndex = car.currentWaypointIndex;
+                const halfwayPoint = Math.floor(trackWaypoints.length / 2);
+                
+                // Check checkpoint progress
+                if (currentWaypointIndex === halfwayPoint && !this.checkpointReached) {
+                    this.checkpointsPassed++;
+                    this.checkpointReached = true;
+                } else if (currentWaypointIndex === 0) {
+                    this.checkpointReached = false;
+                }
+                
+                // Check start/finish line crossing
+                if (this.crossedStartLine(car)) {
+                    // Valid lap only if all checkpoints passed
+                    if (this.checkpointsPassed >= this.totalCheckpoints) {
+                        this.completeLap(car, deltaTime);
+                    }
+                }
+            }
+            
+            crossedStartLine(car) {
+                // Check if car crossed the start line (moving in correct direction)
+                const carAheadOfLine = (car.x - startLine.x) * startLine.normalX > 0;
+                const carPrevBehindLine = (car.prevX - startLine.x) * startLine.normalX <= 0;
+                
+                return carAheadOfLine && carPrevBehindLine;
+            }
+            
+            completeLap(car, deltaTime) {
+                this.currentLap++;
+                this.checkpointsPassed = 0;
+                
+                const lapTime = performance.now() - this.lapStartTime;
+                this.lapTimes.push(lapTime);
+                
+                if (this.currentLap >= this.totalLaps) {
+                    this.finished = true;
+                    this.totalRaceTime = performance.now() - this.lapStartTime;
+                } else {
+                    this.lapStartTime = performance.now();
+                }
+            }
+            
+            getBestLapTime() {
+                if (this.lapTimes.length === 0) return Infinity;
+                return Math.min(...this.lapTimes);
+            }
+        }
+
+        // ============================================
+        // SECTION 7: GAME STATE MANAGEMENT
+        // ============================================
+        const GameState = {
+            WAITING: 'waiting',
+            COUNTDOWN: 'countdown',
+            RACING: 'racing',
+            FINISHED: 'finished'
+        };
+
+        class RaceManager {
+            constructor() {
+                this.state = GameState.WAITING;
+                this.countdownValue = 3;
+                this.countdownTimer = 0;
+                this.raceStartTime = 0;
+                this.elapsedTime = 0;
+                
+                // Position tracking
+                this.positions = [];
+                this.playerPosition = 1;
+                this.finishOrder = [];
+            }
+            
+            update(dt, playerCar, aiOpponents) {
+                switch (this.state) {
+                    case GameState.WAITING:
+                        this.handleWaitingState(dt);
+                        break;
+                    case GameState.COUNTDOWN:
+                        this.handleCountdownState(dt);
+                        break;
+                    case GameState.RACING:
+                        this.handleRacingState(dt, playerCar, aiOpponents);
+                        break;
+                    case GameState.FINISHED:
+                        this.handleFinishedState(dt);
+                        break;
+                }
+            }
+            
+            handleWaitingState(dt) {
+                // Wait for player to press start
+                if (input.startPressed) {
+                    this.state = GameState.COUNTDOWN;
+                    this.countdownValue = 3;
+                    this.countdownTimer = 1.0;
+                    input.startPressed = false;
+                }
+            }
+            
+            handleCountdownState(dt) {
+                this.countdownTimer -= dt;
+                
+                if (this.countdownTimer <= 0) {
+                    this.countdownValue--;
+                    
+                    if (this.countdownValue < 0) {
+                        this.state = GameState.RACING;
+                        this.raceStartTime = performance.now();
+                        this.startRace();
+                    } else {
+                        this.countdownTimer = 1.0;
+                    }
+                }
+            }
+            
+            handleRacingState(dt, playerCar, aiOpponents) {
+                this.elapsedTime = (performance.now() - this.raceStartTime) / 1000;
+                this.updatePositions(playerCar, aiOpponents);
+                
+                // Check if player finished
+                if (playerCar.lapCounter.finished) {
+                    this.state = GameState.FINISHED;
+                    this.finishOrder.push('Player');
+                }
+                
+                // Check if all AI finished
+                aiOpponents.forEach((ai, index) => {
+                    if (ai.lapCounter.finished && !this.finishOrder.includes(`AI ${index + 1}`)) {
+                        this.finishOrder.push(`AI ${index + 1}`);
+                    }
+                });
+                
+                // Race ends when everyone finishes
+                if (this.finishOrder.length >= 4) {
+                    this.state = GameState.FINISHED;
+                }
+            }
+            
+            handleFinishedState(dt) {
+                // Show results screen
+            }
+            
+            startRace() {
+                // Initialize lap counters
+                playerCar.lapCounter.lapStartTime = performance.now();
+                aiOpponents.forEach(ai => {
+                    ai.lapCounter.lapStartTime = performance.now();
+                });
+            }
+            
+            updatePositions(playerCar, aiOpponents) {
+                const allCars = [playerCar, ...aiOpponents];
+                
+                this.positions = allCars.map((car, index) => ({
+                    index: index,
+                    lap: car.lapCounter.currentLap,
+                    checkpoint: car.currentWaypointIndex,
+                    distanceToNext: this.getDistanceToNextWaypoint(car)
+                }));
+                
+                // Sort by lap (desc), checkpoint (desc), distance (asc)
+                this.positions.sort((a, b) => {
+                    if (b.lap !== a.lap) return b.lap - a.lap;
+                    if (b.checkpoint !== a.checkpoint) return b.checkpoint - a.checkpoint;
+                    return a.distanceToNext - b.distanceToNext;
+                });
+                
+                // Find player position
+                this.playerPosition = this.positions.findIndex(p => p.index === 0) + 1;
+            }
+            
+            getDistanceToNextWaypoint(car) {
+                const waypoint = trackWaypoints[car.currentWaypointIndex];
+                return Math.hypot(waypoint.x - car.x, waypoint.y - car.y);
+            }
+        }
+
+        // ============================================
+        // SECTION 8: HUD SYSTEM
+        // ============================================
+        class HUD {
+            constructor() {
+                this.fontMain = 'bold 24px Arial';
+                this.fontSmall = '18px Arial';
+                this.fontLarge = 'bold 48px Arial';
+                this.padding = 20;
+            }
+            
+            render(ctx, gameState, playerCar, raceManager) {
+                // Top bar background
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, ctx.canvas.width, 50);
+                
+                // Position
+                ctx.fillStyle = '#ffffff';
+                ctx.font = this.fontMain;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`POS: ${raceManager.playerPosition}/4`, this.padding, 25);
+                
+                // Lap count
+                const lapText = `LAP: ${playerCar.lapCounter.currentLap + 1}/${playerCar.lapCounter.totalLaps}`;
+                const lapWidth = ctx.measureText(lapText).width;
+                ctx.fillText(lapText, ctx.canvas.width / 2 - lapWidth / 2, 25);
+                
+                // Current time
+                const timeStr = this.formatTime(raceManager.elapsedTime);
+                const timeText = `TIME: ${timeStr}`;
+                const timeWidth = ctx.measureText(timeText).width;
+                ctx.fillText(timeText, ctx.canvas.width / 2 + timeWidth / 2 + 40, 25);
+                
+                // Best lap time
+                const bestLap = playerCar.lapCounter.getBestLapTime();
+                const bestStr = bestLap === Infinity ? 'BEST: --:--.--' : `BEST: ${this.formatTime(bestLap / 1000)}`;
+                ctx.textAlign = 'right';
+                ctx.fillText(bestStr, ctx.canvas.width - this.padding, 25);
+                
+                // Speedometer (bottom left)
+                this.renderSpeedometer(ctx, playerCar);
+                
+                // Countdown overlay
+                if (gameState.state === GameState.COUNTDOWN) {
+                    this.renderCountdown(ctx, gameState.countdownValue);
+                }
+                
+                // Finish overlay
+                if (gameState.state === GameState.FINISHED) {
+                    this.renderFinishOverlay(ctx, raceManager);
+                }
+            }
+            
+            renderSpeedometer(ctx, car) {
+                const speed = Math.abs(car.getSignedSpeed());
+                const maxSpeed = car.maxSpeed;
+                const speedPercent = speed / maxSpeed;
+                
+                const centerX = 80;
+                const centerY = ctx.canvas.height - 60;
+                const radius = 50;
+                
+                // Background arc
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, Math.PI, 0);
+                ctx.strokeStyle = '#444';
+                ctx.lineWidth = 10;
+                ctx.stroke();
+                
+                // Speed arc
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, Math.PI, Math.PI + Math.PI * speedPercent);
+                ctx.strokeStyle = speedPercent > 0.9 ? '#ff0000' : '#00ff00';
+                ctx.lineWidth = 10;
+                ctx.stroke();
+                
+                // Speed text
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(Math.floor(speed), centerX, centerY + 5);
+                ctx.font = '12px Arial';
+                ctx.fillText('km/h', centerX, centerY + 20);
+            }
+            
+            renderCountdown(ctx, value) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = this.fontLarge;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                const text = value === 0 ? 'GO!' : value.toString();
+                ctx.fillText(text, ctx.canvas.width / 2, ctx.canvas.height / 2);
+            }
+            
+            renderFinishOverlay(ctx, raceManager) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = this.fontLarge;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                ctx.fillText('RACE FINISHED!', ctx.canvas.width / 2, ctx.canvas.height / 2 - 60);
+                
+                // Show finish order
+                ctx.font = this.fontMain;
+                const finishText = raceManager.finishOrder.join(' > ');
+                ctx.fillText(finishText, ctx.canvas.width / 2, ctx.canvas.height / 2);
+                
+                // Show player position
+                ctx.font = 'bold 36px Arial';
+                ctx.fillStyle = raceManager.playerPosition === 1 ? '#00ff00' : '#ffffff';
+                ctx.fillText(`You finished ${raceManager.playerPosition}${this.getOrdinalSuffix(raceManager.playerPosition)}`, 
+                            ctx.canvas.width / 2, ctx.canvas.height / 2 + 60);
+                
+                ctx.font = '18px Arial';
+                ctx.fillStyle = '#aaaaaa';
+                ctx.fillText('Press SPACE to restart', ctx.canvas.width / 2, ctx.canvas.height / 2 + 120);
+            }
+            
+            getOrdinalSuffix(num) {
+                const j = num % 10;
+                const k = num % 100;
+                if (j === 1 && k !== 11) return 'st';
+                if (j === 2 && k !== 12) return 'nd';
+                if (j === 3 && k !== 13) return 'rd';
+                return 'th';
+            }
+            
+            formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                const ms = Math.floor((seconds % 1) * 100);
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+            }
+        }
+
+        // ============================================
+        // SECTION 9: RENDERING
+        // ============================================
+        function renderTrack(ctx) {
+            // Draw grass background
+            ctx.fillStyle = '#2d5016';
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            
+            // Draw track surface
+            ctx.beginPath();
+            ctx.moveTo(track.outerPath[0].x, track.outerPath[0].y);
+            for (let i = 1; i < track.outerPath.length; i++) {
+                ctx.lineTo(track.outerPath[i].x, track.outerPath[i].y);
+            }
+            ctx.closePath();
+            ctx.fillStyle = '#333333';
+            ctx.fill();
+            
+            // Draw inner grass (cut out)
+            ctx.beginPath();
+            ctx.moveTo(track.innerPath[0].x, track.innerPath[0].y);
+            for (let i = 1; i < track.innerPath.length; i++) {
+                ctx.lineTo(track.innerPath[i].x, track.innerPath[i].y);
+            }
+            ctx.closePath();
+            ctx.fillStyle = '#2d5016';
+            ctx.fill();
+            
+            // Draw track borders
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            
+            // Outer border
+            ctx.beginPath();
+            ctx.moveTo(track.outerPath[0].x, track.outerPath[0].y);
+            for (let i = 1; i < track.outerPath.length; i++) {
+                ctx.lineTo(track.outerPath[i].x, track.outerPath[i].y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+            
+            // Inner border
+            ctx.beginPath();
+            ctx.moveTo(track.innerPath[0].x, track.innerPath[0].y);
+            for (let i = 1; i < track.innerPath.length; i++) {
+                ctx.lineTo(track.innerPath[i].x, track.innerPath[i].y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+            
+            // Draw start/finish line
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(startLine.x - startLine.width / 2, startLine.y - startLine.height / 2, 
+                        startLine.width, startLine.height);
+            
+            // Checkered pattern on start/finish
+            const checkSize = 5;
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 8; j++) {
+                    ctx.fillStyle = (i + j) % 2 === 0 ? '#000000' : '#ffffff';
+                    ctx.fillRect(startLine.x - startLine.width / 2 + i * checkSize, 
+                                startLine.y - startLine.height / 2 + j * checkSize, 
+                                checkSize, checkSize);
+                }
+            }
+            
+            // Draw waypoints (debug visualization)
+            // ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+            // trackWaypoints.forEach(wp => {
+            //     ctx.beginPath();
+            //     ctx.arc(wp.x, wp.y, wp.radius, 0, Math.PI * 2);
+            //     ctx.fill();
+            // });
+        }
+        
+        function renderCar(ctx, car, alpha) {
+            const x = car.getInterpolatedX(alpha);
+            const y = car.getInterpolatedY(alpha);
+            const angle = car.getInterpolatedAngle(alpha);
+            
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            
+            // Car body
+            ctx.fillStyle = car.color;
+            ctx.fillRect(-car.width / 2, -car.height / 2, car.width, car.height);
+            
+            // Car details (windshield)
+            ctx.fillStyle = '#333333';
+            ctx.fillRect(0, -car.height / 2 + 2, car.width / 4, car.height - 4);
+            
+            // Headlights
+            ctx.fillStyle = '#ffff00';
+            ctx.fillRect(car.width / 2 - 2, -car.height / 2 + 2, 2, 4);
+            ctx.fillRect(car.width / 2 - 2, car.height / 2 - 6, 2, 4);
+            
+            // Taillights
+            ctx.fillStyle = '#ff0000';
+            ctx.fillRect(-car.width / 2, -car.height / 2 + 2, 2, 4);
+            ctx.fillRect(-car.width / 2, car.height / 2 - 6, 2, 4);
+            
+            ctx.restore();
+        }
+
+        // ============================================
+        // SECTION 10: GAME LOOP
+        // ============================================
+        let lastTime = 0;
+        let accumulator = 0;
+        let deltaTime = 0;
+
+        function gameLoop(currentTime) {
+            currentTime = currentTime / 1000;  // Convert to seconds
+            deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            // Clamp delta time to prevent instability
+            if (deltaTime > CONFIG.MAX_FRAME_TIME) {
+                deltaTime = CONFIG.MAX_FRAME_TIME;
+            }
+            
+            accumulator += deltaTime;
+            
+            // Fixed timestep physics updates
+            while (accumulator >= CONFIG.FIXED_TIMESTEP) {
+                update(CONFIG.FIXED_TIMESTEP);
+                accumulator -= CONFIG.FIXED_TIMESTEP;
+            }
+            
+            // Render with interpolation factor
+            const alpha = accumulator / CONFIG.FIXED_TIMESTEP;
+            render(alpha);
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        function update(dt) {
+            // 1. Process input
+            if (raceManager.state === GameState.RACING) {
+                playerCar.handleInput(input);
+            } else {
+                playerCar.throttle = 0;
+                playerCar.brake = 0;
+                playerCar.steerInput = 0;
+            }
+            
+            // 2. Update player car physics
+            if (raceManager.state === GameState.RACING || raceManager.state === GameState.COUNTDOWN) {
+                playerCar.update(dt);
+                
+                // 3. Update AI opponents
+                aiOpponents.forEach(ai => {
+                    ai.updateAI(dt, trackWaypoints);
+                    ai.update(dt);
+                });
+            }
+            
+            // 4. Collision detection and resolution
+            if (raceManager.state === GameState.RACING) {
+                detectAndResolveCollisions();
+            }
+            
+            // 5. Update lap/checkpoint state
+            playerCar.lapCounter.update(playerCar, dt);
+            aiOpponents.forEach(ai => ai.lapCounter.update(ai, dt));
+            
+            // 6. Update game state
+            raceManager.update(dt, playerCar, aiOpponents);
+            
+            // Check for restart
+            if (raceManager.state === GameState.FINISHED && input.startPressed) {
+                resetGame();
+                input.startPressed = false;
+            }
+        }
+
+        function detectAndResolveCollisions() {
+            const allCars = [playerCar, ...aiOpponents];
+            
+            // Car-to-car collisions
+            for (let i = 0; i < allCars.length; i++) {
+                for (let j = i + 1; j < allCars.length; j++) {
+                    const collision = Collision.checkCircleCollision(allCars[i], allCars[j]);
+                    if (collision.colliding) {
+                        Collision.resolveCollision(allCars[i], allCars[j], collision);
+                    }
+                }
+            }
+            
+            // Car-to-wall collisions
+            allCars.forEach(car => {
+                const wallCollision = Collision.checkTrackBoundaryCollision(car, trackBoundaries);
+                if (wallCollision.colliding) {
+                    Collision.resolveWallCollision(car, wallCollision);
+                }
+            });
+        }
+
+        function render(alpha) {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Render track
+            renderTrack(ctx);
+            
+            // Render entities with interpolation
+            renderCar(ctx, playerCar, alpha);
+            aiOpponents.forEach(ai => renderCar(ctx, ai, alpha));
+            
+            // Render HUD
+            hud.render(ctx, raceManager, playerCar, raceManager);
+        }
+
+        // ============================================
+        // SECTION 11: INITIALIZATION
+        // ============================================
+        let canvas, ctx;
+        let input;
+        let playerCar;
+        let aiOpponents;
+        let raceManager;
+        let hud;
+
+        function init() {
+            // Get canvas and context
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            
+            // Initialize RNG
+            rng = new SeededRandom(CONFIG.GAME_SEED);
+            
+            // Create input handler
+            input = new InputHandler();
+            
+            // Create player car at starting position
+            playerCar = new PlayerCar(150, 170, 0);
+            playerCar.lapCounter = new LapCounter();
+            
+            // Create AI opponents with varying difficulties
+            aiOpponents = [
+                new AIOpponent(150, 210, 0, rng.range(0.5, 0.7), 0, '#3333ff'),  // Easy - Blue
+                new AIOpponent(150, 250, 0, rng.range(0.7, 0.85), 0, '#33ff33'), // Medium - Green
+                new AIOpponent(150, 290, 0, rng.range(0.85, 1.0), 0, '#ffff33'), // Hard - Yellow
+            ];
+            aiOpponents.forEach(ai => ai.lapCounter = new LapCounter());
+            
+            // Initialize race manager
+            raceManager = new RaceManager();
+            
+            // Initialize HUD
+            hud = new HUD();
+            
+            // Start game loop
+            requestAnimationFrame(gameLoop);
+        }
+
+        function resetGame() {
+            // Reset player car
+            playerCar.x = 150;
+            playerCar.y = 170;
+            playerCar.angle = 0;
+            playerCar.velocityX = 0;
+            playerCar.velocityY = 0;
+            playerCar.angularVelocity = 0;
+            playerCar.lapCounter = new LapCounter();
+            
+            // Reset AI opponents
+            const startYPositions = [210, 250, 290];
+            aiOpponents.forEach((ai, index) => {
+                ai.x = 150;
+                ai.y = startYPositions[index];
+                ai.angle = 0;
+                ai.velocityX = 0;
+                ai.velocityY = 0;
+                ai.angularVelocity = 0;
+                ai.currentWaypointIndex = 0;
+                ai.lapCounter = new LapCounter();
+            });
+            
+            // Reset race manager
+            raceManager = new RaceManager();
+        }
+
+        // Start the game when page loads
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

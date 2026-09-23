@@ -1,0 +1,3 @@
+- Developed in OpenCode
+- Very similar output as Frozenlock-Qwen3.8-27B-int4-AutoRound-kv_bf16-dflash2
+    - Except that the race standings is fully functional here

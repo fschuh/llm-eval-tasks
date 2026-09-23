@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top-Down Racing Prototype</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #222;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        canvas {
+            display: block;
+            background: #333;
+        }
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px;
+            border-radius: 8px;
+            pointer-events: none;
+            font-size: 18px;
+            border: 2px solid #555;
+        }
+        .stat { margin-bottom: 5px; }
+        .highlight { color: #ffcc00; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        <div class="stat">Position: <span id="pos" class="highlight">1/4</span></div>
+        <div class="stat">Lap: <span id="lap" class="highlight">1/3</span></div>
+        <div class="stat">Time: <span id="time" class="highlight">0.00s</span></div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        /**
+         * DETERMINISTIC RNG
+         * Simple LCG for deterministic behavior
+         */
+        class Random {
+            constructor(seed) {
+                this.seed = seed;
+            }
+            next() {
+                this.seed = (this.seed * 1664525 + 1013904223) % 4294967296;
+                return this.seed / 4294967296;
+            }
+            range(min, max) {
+                return min + this.next() * (max - min);
+            }
+        }
+
+        const RNG = new Random(12345);
+
+        /**
+         * VECTOR MATH
+         */
+        class Vec2 {
+            constructor(x = 0, y = 0) {
+                this.x = x;
+                this.y = y;
+            }
+            add(v) { return new Vec2(this.x + v.x, this.y + v.y); }
+            sub(v) { return new Vec2(this.x - v.x, this.y - v.y); }
+            mul(s) { return new Vec2(this.x * s, this.y * s); }
+            div(s) { return new Vec2(this.x / s, this.y / s); }
+            dot(v) { return this.x * v.x + this.y * v.y; }
+            magSq() { return this.x * this.x + this.y * this.y; }
+            mag() { return Math.sqrt(this.magSq()); }
+            normalize() {
+                const m = this.mag();
+                return m > 0 ? this.div(m) : new Vec2(0, 0);
+            }
+            static dist(v1, v2) {
+                return v1.sub(v2).mag();
+            }
+            static angle(v1, v2) {
+                return Math.atan2(v2.y - v1.y, v2.x - v1.x);
+            }
+        }
+
+        /**
+         * CONSTANTS
+         */
+        const CONFIG = {
+            FPS: 60,
+            TIME_STEP: 1 / 60,
+            CAR_WIDTH: 20,
+            CAR_HEIGHT: 40,
+            ACCEL: 150,
+            BRAKE: 300,
+            FRICTION: 0.98,
+            STEER_SPEED: 0.05,
+            MAX_SPEED: 400,
+            LAP_COUNT: 3,
+            COLLISION_ELASTICITY: 0.5
+        };
+
+        /**
+         * CAR CLASS
+         */
+        class Car {
+            constructor(x, y, color, isPlayer = false) {
+                this.pos = new Vec2(x, y);
+                this.vel = new Vec2(0, 0);
+                this.angle = 0;
+                this.speed = 0;
+                this.color = color;
+                this.isPlayer = isPlayer;
+                this.width = CONFIG.CAR_WIDTH;
+                this.height = CONFIG.CAR_HEIGHT;
+                
+                this.lap = 0;
+                this.checkpoint = 0;
+                this.startTime = 0;
+                this.finished = false;
+            }
+
+            update(input, dt) {
+                if (this.finished) return;
+
+                // Steering
+                if (input.left) this.angle -= CONFIG.STEER_SPEED * (Math.abs(this.speed) / 100 + 0.5);
+                if (input.right) this.angle += CONFIG.STEER_SPEED * (Math.abs(this.speed) / 100 + 0.5);
+
+                // Acceleration / Braking
+                if (input.up) {
+                    this.speed += CONFIG.ACCEL * dt;
+                } else if (input.down) {
+                    this.speed -= CONFIG.BRAKE * dt;
+                } else {
+                    this.speed *= CONFIG.FRICTION;
+                }
+
+                // Speed Clamp
+                this.speed = Math.max(-CONFIG.MAX_SPEED * 0.3, Math.min(this.speed, CONFIG.MAX_SPEED));
+
+                // Velocity update
+                const dir = new Vec2(Math.cos(this.angle), Math.sin(this.angle));
+                this.vel = dir.mul(this.speed);
+                this.pos = this.pos.add(this.vel.mul(dt));
+            }
+
+            getBounds() {
+                return {
+                    x: this.pos.x - this.width / 2,
+                    y: this.pos.y - this.height / 2,
+                    w: this.width,
+                    h: this.height
+                };
+            }
+        }
+
+        /**
+         * TRACK & WAYPOINTS
+         */
+        class Track {
+            constructor() {
+                // Simple oval track
+                this.waypoints = [
+                    new Vec2(200, 200),
+                    new Vec2(600, 200),
+                    new Vec2(700, 300),
+                    new Vec2(700, 500),
+                    new Vec2(600, 600),
+                    new Vec2(200, 600),
+                    new Vec2(100, 500),
+                    new Vec2(100, 300),
+                ];
+                this.startLine = new Vec2(200, 200);
+            }
+
+            draw(ctx) {
+                ctx.strokeStyle = "#777";
+                ctx.lineWidth = 60;
+                ctx.lineJoin = "round";
+                ctx.beginPath();
+                ctx.moveTo(this.waypoints[0].x, this.waypoints[0].y);
+                for (let i = 1; i < this.waypoints.length; i++) {
+                    ctx.lineTo(this.waypoints[i].x, this.waypoints[i].y);
+                }
+                ctx.closePath();
+                ctx.stroke();
+
+                // Draw start line
+                ctx.strokeStyle = "white";
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.moveTo(200, 170);
+                ctx.lineTo(200, 230);
+                ctx.stroke();
+
+                // Draw waypoints (debug)
+                ctx.fillStyle = "rgba(255,255,255,0.2)";
+                for (let wp of this.waypoints) {
+                    ctx.beginPath();
+                    ctx.arc(wp.x, wp.y, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        /**
+         * GAME ENGINE
+         */
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+
+                this.track = new Track();
+                this.cars = [];
+                this.player = new Car(200, 200, '#3498db', true);
+                this.cars.push(this.player);
+
+                const aiColors = ['#e74c3c', '#2ecc71', '#f1c40f'];
+                for (let i = 0; i < 3; i++) {
+                    const ai = new Car(200 + (i + 1) * 30, 220 + (i * 10), aiColors[i]);
+                    this.cars.push(ai);
+                }
+
+                this.keys = {};
+                window.addEventListener('keydown', e => this.keys[e.code] = true);
+                window.addEventListener('keyup', e => this.keys[e.code] = false);
+
+                this.startTime = Date.now();
+                this.accumulator = 0;
+                this.lastTime = performance.now();
+            }
+
+            handleInput(car) {
+                if (car.isPlayer) {
+                    return {
+                        up: this.keys['ArrowUp'] || this.keys['KeyW'],
+                        down: this.keys['ArrowDown'] || this.keys['KeyS'],
+                        left: this.keys['ArrowLeft'] || this.keys['KeyA'],
+                        right: this.keys['ArrowRight'] || this.keys['KeyD'],
+                    };
+                }
+                
+                // AI Logic: Waypoint following
+                const target = this.track.waypoints[car.checkpoint % this.track.waypoints.length];
+                const dist = Vec2.dist(car.pos, target);
+                
+                if (dist < 50) {
+                    car.checkpoint++;
+                }
+
+                const targetAngle = Vec2.angle(car.pos, target);
+                let angleDiff = targetAngle - car.angle;
+                while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+                return {
+                    up: true,
+                    down: angleDiff > 0.5 || angleDiff < -0.5 ? false : true,
+                    left: angleDiff < -0.1,
+                    right: angleDiff > 0.1
+                };
+            }
+
+            resolveCollisions() {
+                for (let i = 0; i < this.cars.length; i++) {
+                    for (let j = i + 1; j < this.cars.length; j++) {
+                        const c1 = this.cars[i];
+                        const c2 = this.cars[j];
+                        
+                        const dist = Vec2.dist(c1.pos, c2.pos);
+                        const minDist = (c1.width + c2.width) / 2;
+
+                        if (dist < minDist) {
+                            // Simple impulse resolution
+                            const normal = c1.pos.sub(c2.pos).normalize();
+                            const relativeVel = c1.vel.sub(c2.vel);
+                            const velAlongNormal = relativeVel.dot(normal);
+
+                            if (velAlongNormal < 0) {
+                                const impulseMag = -(1 + CONFIG.COLLISION_ELASTICITY) * velAlongNormal / 2;
+                                const impulse = normal.mul(impulseMag);
+                                
+                                c1.vel = c1.vel.add(impulse);
+                                c2.vel = c2.vel.sub(impulse);
+                                
+                                // Push apart to prevent sticking
+                                const overlap = minDist - dist;
+                                const separation = normal.mul(overlap / 2);
+                                c1.pos = c1.pos.add(separation);
+                                c2.pos = c2.pos.sub(separation);
+                            }
+                        }
+                    }
+                }
+            }
+
+            updateLaps() {
+                this.cars.forEach(car => {
+                    // Simple lap detection: must pass waypoint 4 (halfway) then cross start line
+                    const distToStart = Vec2.dist(car.pos, this.track.startLine);
+                    if (distToStart < 60 && car.checkpoint >= this.track.waypoints.length / 2) {
+                        car.lap++;
+                        car.checkpoint = 0;
+                        if (car.lap >= CONFIG.LAP_COUNT) {
+                            car.finished = true;
+                        }
+                    }
+                });
+            }
+
+            update() {
+                const now = performance.now();
+                const frameTime = (now - this.lastTime) / 1000;
+                this.lastTime = now;
+                this.accumulator += frameTime;
+
+                while (this.accumulator >= CONFIG.TIME_STEP) {
+                    this.cars.forEach(car => {
+                        car.update(this.handleInput(car), CONFIG.TIME_STEP);
+                    });
+
+                    this.resolveCollisions();
+                    this.updateLaps();
+                    this.accumulator -= CONFIG.TIME_STEP;
+                }
+            }
+
+            draw() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.track.draw(this.ctx);
+
+                this.cars.forEach(car => {
+                    this.ctx.save();
+                    this.ctx.translate(car.pos.x, car.pos.y);
+                    this.ctx.rotate(car.angle);
+                    this.ctx.fillStyle = car.color;
+                    this.ctx.fillRect(-car.width / 2, -car.height / 2, car.width, car.height);
+                    
+                    // Headlights
+                    this.ctx.fillStyle = "white";
+                    this.ctx.fillRect(-car.width / 2 + 2, -car.height / 2, 4, 4);
+                    this.ctx.fillRect(car.width / 2 - 6, -car.height / 2, 4, 4);
+                    this.ctx.restore();
+                });
+
+                this.updateHUD();
+            }
+
+            updateHUD() {
+                const sorted = [...this.cars].sort((a, b) => {
+                    if (a.lap !== b.lap) return b.lap - a.lap;
+                    return Vec2.dist(a.pos, this.track.waypoints[a.checkpoint % this.track.waypoints.length]) - 
+                           Vec2.dist(b.pos, this.track.waypoints[b.checkpoint % this.track.waypoints.length]);
+                });
+
+                const playerPos = sorted.indexOf(this.player) + 1;
+                document.getElementById('pos').innerText = `${playerPos}/${this.cars.length}`;
+                document.getElementById('lap').innerText = `${this.player.lap + 1}/${CONFIG.LAP_COUNT}`;
+                
+                const elapsed = (Date.now() - this.startTime) / 1000;
+                document.getElementById('time').innerText = elapsed.toFixed(2) + "s";
+            }
+
+            loop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.loop());
+            }
+        }
+
+        const game = new Game();
+        game.loop();
+    </script>
+</body>
+</html>

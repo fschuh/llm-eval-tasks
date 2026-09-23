@@ -1,0 +1,11 @@
+- Developed using the Codex Visual Studio Code extension
+- The resulting game runs with no errors
+- The car turning physics are well done, despite the cars being slow
+- The AI is pretty good and tries to avoid the player's car
+- Collision physics don't have any response other than pushing other cars
+ - If the car hits a wall, there is no force pushing it back - it just stops
+- Reverse is implemented properly, including turning
+- The lap count works
+- The lap counter works
+- Position rank mostly works, but it sometimes gets confused with the ranks 1 and 2
+- The race ends when completing the last lap, showing a Race Compete popup with your final position, total time and best lap time

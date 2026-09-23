@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Top-Down Arcade Racer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #111;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+canvas {
+  border: 2px solid #333;
+  image-rendering: pixelated;
+}
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<script>
+// ============================================================
+// 1. DETERMINISTIC RNG - Mulberry32
+// ============================================================
+function mulberry32(seed) {
+  let s = seed | 0;
+  return function() {
+    s |= 0; s = s + 0x6D2B79F5 | 0;
+    let t = Math.imul(s ^ s >>> 15, 1 | s);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+const rng = mulberry32(42);
+
+// ============================================================
+// 2. FIXED TIMESTEP GAME LOOP
+// ============================================================
+const FIXED_DT = 1 / 60;
+const MAX_ACCUMULATOR = 0.2;
+let accumulator = 0;
+let lastTime = 0;
+let interpolationFactor = 0;
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = 1280;
+canvas.height = 720;
+
+// ============================================================
+// 3. TRACK DEFINITION - Closed-loop circuit with waypoints
+// ============================================================
+const TRACK_WIDTH = 140;
+const HALF_TRACK = TRACK_WIDTH / 2;
+
+// Main circuit waypoints (closed loop) - larger track centered around (600, 500)
+const trackWaypoints = [
+  { x: 300, y: 350 },    // start/finish straight
+  { x: 600, y: 350 },    // straight
+  { x: 850, y: 340 },    // approaching turn
+  { x: 1000, y: 260 },   // chicane entry
+  { x: 1080, y: 180 },   // chicane apex 1
+  { x: 1140, y: 250 },   // chicane apex 2
+  { x: 1180, y: 340 },   // chicane exit
+  { x: 1200, y: 450 },   // long curve
+  { x: 1200, y: 580 },   // continuing curve
+  { x: 1140, y: 660 },   // bottom curve
+  { x: 1000, y: 700 },   // bottom straight
+  { x: 750, y: 700 },    // bottom straight
+  { x: 580, y: 670 },    // approaching hairpin
+  { x: 460, y: 600 },    // hairpin entry
+  { x: 400, y: 500 },    // hairpin apex
+  { x: 400, y: 420 },    // hairpin exit
+  { x: 350, y: 370 },    // back to start
+];
+
+// Checkpoints (subset of waypoints for lap detection)
+const checkpointIndices = [0, 4, 8, 12]; // start, chicane, bottom, hairpin
+
+// Generate track edges (inner and outer boundaries)
+function generateTrackEdges() {
+  const outerEdges = [];
+  const innerEdges = [];
+  
+  for (let i = 0; i < trackWaypoints.length; i++) {
+    const prev = trackWaypoints[(i - 1 + trackWaypoints.length) % trackWaypoints.length];
+    const curr = trackWaypoints[i];
+    const next = trackWaypoints[(i + 1) % trackWaypoints.length];
+    
+    // Calculate perpendicular direction
+    const dx1 = curr.x - prev.x;
+    const dy1 = curr.y - prev.y;
+    const dx2 = next.x - curr.x;
+    const dy2 = next.y - curr.y;
+    
+    // Average direction
+    const avgDx = (dx1 + dx2) / 4;
+    const avgDy = (dy1 + dy2) / 4;
+    const len = Math.sqrt(avgDx * avgDx + avgDy * avgDy) || 1;
+    
+    // Perpendicular
+    const px = -avgDy / len;
+    const py = avgDx / len;
+    
+    outerEdges.push({ x: curr.x + px * HALF_TRACK, y: curr.y + py * HALF_TRACK });
+    innerEdges.push({ x: curr.x - px * HALF_TRACK, y: curr.y - py * HALF_TRACK });
+  }
+  
+  return { outerEdges, innerEdges };
+}
+
+const { outerEdges, innerEdges } = generateTrackEdges();
+
+// Camera
+const camera = { x: 0, y: 0 };
+
+// ============================================================
+// 4. CAR PHYSICS
+// ============================================================
+function createCar(x, y, angle, color, isPlayer) {
+  return {
+    x, y,
+    angle,
+    vx: 0, vy: 0,
+    speed: 0,
+    angularVelocity: 0,
+    color,
+    isPlayer,
+    width: 30,
+    height: 16,
+    radius: 14,
+    // Physics properties
+    maxSpeed: isPlayer ? 340 : 300 + rng() * 35,
+    acceleration: isPlayer ? 300 : 260 + rng() * 35,
+    brakeForce: 380,
+    friction: 0.972,
+    turnRate: 3.4,
+    // Race state
+    laps: 0,
+    currentCheckpoint: 0,
+    lapStartTime: 0,
+    lapTimes: [],
+    bestLapTime: Infinity,
+    totalRaceTime: 0,
+    finished: false,
+    finishTime: 0,
+    // For interpolation
+    prevX: x, prevY: y,
+    prevAngle: angle,
+  };
+}
+
+function updateCar(car, input, dt) {
+  // Store previous state for interpolation
+  car.prevX = car.x;
+  car.prevY = car.y;
+  car.prevAngle = car.angle;
+  
+  const forward = { x: Math.cos(car.angle), y: Math.sin(car.angle) };
+  
+  // Calculate speed magnitude
+  car.speed = Math.sqrt(car.vx * car.vx + car.vy * car.vy);
+  
+  // Apply acceleration/braking
+  if (input.accelerate) {
+    car.vx += forward.x * car.acceleration * dt;
+    car.vy += forward.y * car.acceleration * dt;
+  }
+  if (input.brake) {
+    car.vx -= forward.x * car.brakeForce * dt;
+    car.vy -= forward.y * car.brakeForce * dt;
+  }
+  
+  // Steering
+  const speedRatio = Math.min(car.speed / car.maxSpeed, 1);
+  if (input.steerLeft) {
+    car.angle -= car.turnRate * dt * speedRatio * (car.speed > 15 ? 1 : 0);
+  }
+  if (input.steerRight) {
+    car.angle += car.turnRate * dt * speedRatio * (car.speed > 15 ? 1 : 0);
+  }
+  
+  // Apply friction/drag
+  car.vx *= Math.pow(car.friction, dt * 60);
+  car.vy *= Math.pow(car.friction, dt * 60);
+  
+  // Clamp speed
+  const newSpeed = Math.sqrt(car.vx * car.vx + car.vy * car.vy);
+  if (newSpeed > car.maxSpeed) {
+    const scale = car.maxSpeed / newSpeed;
+    car.vx *= scale;
+    car.vy *= scale;
+  }
+  
+  // Update position
+  car.x += car.vx * dt;
+  car.y += car.vy * dt;
+  
+  // Update race timing
+  car.totalRaceTime += dt;
+  
+  // Interpolation factor
+  car._interpolationFactor = interpolationFactor;
+}
+
+// ============================================================
+// 5. AI SYSTEM
+// ============================================================
+function createAI(x, y, angle, color, targetSpeed) {
+  const car = createCar(x, y, angle, color, false);
+  car.targetSpeed = targetSpeed;
+  car.currentWaypoint = 1;
+  car.lineOffset = (rng() > 0.5 ? 1 : -1) * (25 + rng() * 35); // Inner or outer line
+  return car;
+}
+
+function updateAI(ai, dt) {
+  // Find target waypoint
+  const target = trackWaypoints[ai.currentWaypoint];
+  
+  // Apply line offset perpendicular to direction
+  const dirX = target.x - ai.x;
+  const dirY = target.y - ai.y;
+  const dirLen = Math.sqrt(dirX * dirX + dirY * dirY);
+  const perpX = -dirY / dirLen;
+  const perpY = dirX / dirLen;
+  
+  const offsetX = ai.lineOffset * perpX;
+  const offsetY = ai.lineOffset * perpY;
+  const targetX = target.x + offsetX;
+  const targetY = target.y + offsetY;
+  
+  // Direction to target
+  const toTargetX = targetX - ai.x;
+  const toTargetY = targetY - ai.y;
+  const targetAngle = Math.atan2(toTargetY, toTargetX);
+  
+  // Steering
+  let angleDiff = targetAngle - ai.angle;
+  while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+  while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+  
+  ai.angle += Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), ai.turnRate * dt);
+  
+  // Speed control - slow down for sharp turns
+  const turnFactor = 1 - Math.abs(angleDiff) / Math.PI;
+  const speedTarget = ai.targetSpeed * (0.45 + 0.55 * turnFactor);
+  
+  // Accelerate or decelerate toward target speed
+  ai.speed = Math.sqrt(ai.vx * ai.vx + ai.vy * ai.vy);
+  if (ai.speed < speedTarget) {
+    const forward = { x: Math.cos(ai.angle), y: Math.sin(ai.angle) };
+    ai.vx += forward.x * ai.acceleration * dt;
+    ai.vy += forward.y * ai.acceleration * dt;
+  } else {
+    const forward = { x: Math.cos(ai.angle), y: Math.sin(ai.angle) };
+    ai.vx -= forward.x * ai.brakeForce * 0.25 * dt;
+    ai.vy -= forward.y * ai.brakeForce * 0.25 * dt;
+  }
+  
+  // Apply friction
+  ai.vx *= Math.pow(ai.friction, dt * 60);
+  ai.vy *= Math.pow(ai.friction, dt * 60);
+  
+  // Clamp speed
+  ai.speed = Math.sqrt(ai.vx * ai.vx + ai.vy * ai.vy);
+  if (ai.speed > ai.maxSpeed) {
+    const scale = ai.maxSpeed / ai.speed;
+    ai.vx *= scale;
+    ai.vy *= scale;
+  }
+  
+  // Update position
+  ai.x += ai.vx * dt;
+  ai.y += ai.vy * dt;
+  
+  // Check if reached waypoint
+  const distToWaypoint = Math.sqrt(
+    (ai.x - trackWaypoints[ai.currentWaypoint].x) ** 2 +
+    (ai.y - trackWaypoints[ai.currentWaypoint].y) ** 2
+  );
+  
+  if (distToWaypoint < 45) {
+    ai.currentWaypoint = (ai.currentWaypoint + 1) % trackWaypoints.length;
+    if (ai.currentWaypoint === 1) {
+      // Completed a lap (passed start line going to waypoint 1)
+      const lapTime = ai.totalRaceTime - ai.lapStartTime;
+      ai.lapTimes.push(lapTime);
+      if (lapTime < ai.bestLapTime) {
+        ai.bestLapTime = lapTime;
+      }
+      ai.lapStartTime = ai.totalRaceTime;
+      ai.laps++;
+      
+      if (ai.laps >= 5) {
+        ai.finished = true;
+        ai.finishTime = ai.totalRaceTime;
+      }
+    }
+  }
+  
+  // Update race timing
+  ai.totalRaceTime += dt;
+  ai._interpolationFactor = interpolationFactor;
+}
+
+// ============================================================
+// 6. COLLISION DETECTION & RESPONSE
+// ============================================================
+function checkCollision(a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const minDist = a.radius + b.radius;
+  
+  if (dist < minDist && dist > 0.001) {
+    return {
+      collided: true,
+      normal: { x: dx / dist, y: dy / dist },
+      overlap: minDist - dist
+    };
+  }
+  return { collided: false };
+}
+
+function resolveCollision(a, b, collision) {
+  if (!collision.collided) return;
+  
+  const { normal, overlap } = collision;
+  
+  // Separate cars
+  const separationX = normal.x * overlap * 0.5;
+  const separationY = normal.y * overlap * 0.5;
+  a.x -= separationX;
+  a.y -= separationY;
+  b.x += separationX;
+  b.y += separationY;
+  
+  // Relative velocity
+  const relVx = a.vx - b.vx;
+  const relVy = a.vy - b.vy;
+  const relVDotN = relVx * normal.x + relVy * normal.y;
+  
+  // Only resolve if cars are moving toward each other
+  if (relVDotN > 0) {
+    const impulse = relVDotN * 0.7; // 0.7 = coefficient of restitution
+    
+    a.vx -= impulse * normal.x;
+    a.vy -= impulse * normal.y;
+    b.vx += impulse * normal.x;
+    b.vy += impulse * normal.y;
+  }
+}
+
+// ============================================================
+// 7. LAP DETECTION
+// ============================================================
+function checkLapProgress(car, dt) {
+  if (car.finished || !car.isPlayer) return;
+  
+  const nextCheckpointIdx = checkpointIndices[car.currentCheckpoint];
+  const checkpoint = trackWaypoints[nextCheckpointIdx];
+  
+  const dx = car.x - checkpoint.x;
+  const dy = car.y - checkpoint.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  
+  if (dist < TRACK_WIDTH * 0.75) {
+    car.currentCheckpoint++;
+    
+    if (car.currentCheckpoint >= checkpointIndices.length) {
+      // All checkpoints passed - lap complete
+      car.currentCheckpoint = 0;
+      car.laps++;
+      
+      const lapTime = car.totalRaceTime - car.lapStartTime;
+      car.lapTimes.push(lapTime);
+      if (lapTime < car.bestLapTime) {
+        car.bestLapTime = lapTime;
+      }
+      car.lapStartTime = car.totalRaceTime;
+      
+      if (car.laps >= 5) {
+        car.finished = true;
+        car.finishTime = car.totalRaceTime;
+      }
+    }
+  }
+}
+
+// ============================================================
+// 8. HUD
+// ============================================================
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toFixed(2).padStart(5, '0')}`;
+}
+
+function calculatePositions(cars) {
+  return cars.slice().sort((a, b) => {
+    if (a.finished && !b.finished) return -1;
+    if (!a.finished && b.finished) return 1;
+    if (a.finished && b.finished) return a.finishTime - b.finishTime;
+    
+    const aProgress = a.laps * checkpointIndices.length + a.currentCheckpoint;
+    const bProgress = b.laps * checkpointIndices.length + b.currentCheckpoint;
+    
+    if (aProgress !== bProgress) return bProgress - aProgress;
+    
+    // Same checkpoints - compare distance to next checkpoint
+    const nextIdx = checkpointIndices[a.currentCheckpoint % checkpointIndices.length];
+    const nextCP = trackWaypoints[nextIdx];
+    const aDist = Math.sqrt((a.x - nextCP.x) ** 2 + (a.y - nextCP.y) ** 2);
+    const bDist = Math.sqrt((b.x - nextCP.x) ** 2 + (b.y - nextCP.y) ** 2);
+    
+    return aDist - bDist; // Closer to checkpoint = better position
+  });
+}
+
+function getCarPosition(car, positions) {
+  return positions.indexOf(car) + 1;
+}
+
+function drawHUD(player, positions) {
+  const pos = getCarPosition(player, positions);
+  
+  // Semi-transparent background
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+  ctx.fillRect(15, 15, 300, 185);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(15, 15, 300, 185);
+  
+  ctx.font = 'bold 22px monospace';
+  ctx.textAlign = 'left';
+  
+  // Position
+  const posColors = ['#FFD700', '#C0C0C0', '#CD7F32', '#FFFFFF'];
+  ctx.fillStyle = posColors[pos - 1] || '#fff';
+  ctx.fillText(`POS: ${pos}/4`, 30, 48);
+  
+  // Lap
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 20px monospace';
+  ctx.fillText(`LAP: ${Math.min(player.laps + 1, 5)}/5`, 30, 80);
+  
+  // Current lap time
+  const currentLapTime = player.totalRaceTime - player.lapStartTime;
+  ctx.fillText(`TIME: ${formatTime(currentLapTime)}`, 30, 108);
+  
+  // Best lap
+  if (player.bestLapTime < Infinity) {
+    ctx.fillStyle = '#0f0';
+    ctx.fillText(`BEST: ${formatTime(player.bestLapTime)}`, 30, 136);
+  }
+  
+  // Total time
+  ctx.fillStyle = '#aaa';
+  ctx.font = '18px monospace';
+  ctx.fillText(`TOTAL: ${formatTime(player.totalRaceTime)}`, 180, 80);
+  
+  // Speed indicator bar
+  const speedPercent = Math.min(player.speed / player.maxSpeed, 1);
+  ctx.fillStyle = '#333';
+  ctx.fillRect(30, 155, 260, 14);
+  const speedColor = speedPercent > 0.85 ? '#f00' : speedPercent > 0.5 ? '#ff0' : '#0f0';
+  ctx.fillStyle = speedColor;
+  ctx.fillRect(30, 155, 260 * speedPercent, 14);
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(30, 155, 260, 14);
+  ctx.fillStyle = '#fff';
+  ctx.font = '11px monospace';
+  ctx.fillText(`${Math.floor(player.speed * 0.9)} km/h`, 130, 166);
+}
+
+// ============================================================
+// 9. RACE MANAGEMENT
+// ============================================================
+const RACE_LAPS = 5;
+const COUNTDOWN_TIME = 3;
+
+let gameState = 'countdown'; // 'countdown', 'racing', 'finished'
+let countdownTimer = COUNTDOWN_TIME;
+let raceStartTime = 0;
+
+// ============================================================
+// INPUT HANDLING
+// ============================================================
+const keys = {
+  accelerate: false,
+  brake: false,
+  steerLeft: false,
+  steerRight: false,
+};
+
+document.addEventListener('keydown', (e) => {
+  switch(e.key) {
+    case 'ArrowUp': case 'w': case 'W': keys.accelerate = true; break;
+    case 'ArrowDown': case 's': case 'S': keys.brake = true; break;
+    case 'ArrowLeft': case 'a': case 'A': keys.steerLeft = true; break;
+    case 'ArrowRight': case 'd': case 'D': keys.steerRight = true; break;
+  }
+  e.preventDefault();
+});
+
+document.addEventListener('keyup', (e) => {
+  switch(e.key) {
+    case 'ArrowUp': case 'w': case 'W': keys.accelerate = false; break;
+    case 'ArrowDown': case 's': case 'S': keys.brake = false; break;
+    case 'ArrowLeft': case 'a': case 'A': keys.steerLeft = false; break;
+    case 'ArrowRight': case 'd': case 'D': keys.steerRight = false; break;
+  }
+  e.preventDefault();
+});
+
+// ============================================================
+// RENDERING
+// ============================================================
+function drawBackground() {
+  // Green grass background
+  ctx.fillStyle = '#2d5a1e';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Grass texture (deterministic - pre-generated)
+  ctx.fillStyle = '#347a22';
+  grassPattern.forEach(g => {
+    const sx = g.x - camera.x % 100;
+    const sy = g.y - camera.y % 100;
+    ctx.fillRect(((sx % canvas.width) + canvas.width) % canvas.width, 
+                 ((sy % canvas.height) + canvas.height) % canvas.height, 
+                 g.size, g.size);
+  });
+}
+
+// Pre-generate grass pattern for determinism
+const grassPattern = [];
+for (let i = 0; i < 400; i++) {
+  grassPattern.push({
+    x: rng() * 1600,
+    y: rng() * 1000,
+    size: 2 + rng() * 3
+  });
+}
+
+function drawTrack() {
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
+  
+  // Draw track surface using outer/inner edges
+  ctx.beginPath();
+  for (let i = 0; i < outerEdges.length; i++) {
+    if (i === 0) ctx.moveTo(outerEdges[i].x, outerEdges[i].y);
+    else ctx.lineTo(outerEdges[i].x, outerEdges[i].y);
+  }
+  ctx.closePath();
+  
+  // Create hole for inner edge using evenodd
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = '#5a5a5a';
+  ctx.fillRect(200, 100, 1100, 700);
+  ctx.restore();
+  
+  // Draw inner hole (grass)
+  ctx.fillStyle = '#2d5a1e';
+  ctx.beginPath();
+  for (let i = 0; i < innerEdges.length; i++) {
+    if (i === 0) ctx.moveTo(innerEdges[i].x, innerEdges[i].y);
+    else ctx.lineTo(innerEdges[i].x, innerEdges[i].y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  
+  // Redraw track surface
+  ctx.fillStyle = '#5a5a5a';
+  ctx.beginPath();
+  for (let i = 0; i < outerEdges.length; i++) {
+    if (i === 0) ctx.moveTo(outerEdges[i].x, outerEdges[i].y);
+    else ctx.lineTo(outerEdges[i].x, outerEdges[i].y);
+  }
+  ctx.closePath();
+  ctx.save();
+  ctx.clip();
+  ctx.fillRect(200, 100, 1100, 700);
+  ctx.restore();
+  
+  // Draw curbs on outer edge
+  for (let i = 0; i < outerEdges.length; i++) {
+    const next = (i + 1) % outerEdges.length;
+    const curr = outerEdges[i];
+    const nxt = outerEdges[next];
+    
+    const dx = nxt.x - curr.x;
+    const dy = nxt.y - curr.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const px = -dy / len * 10;
+    const py = dx / len * 10;
+    
+    ctx.fillStyle = i % 2 === 0 ? '#cc2222' : '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(curr.x + px, curr.y + py);
+    ctx.lineTo(nxt.x + px, nxt.y + py);
+    ctx.lineTo(nxt.x - px, nxt.y - py);
+    ctx.lineTo(curr.x - px, curr.y - py);
+    ctx.closePath();
+    ctx.fill();
+  }
+  
+  // Draw curbs on inner edge
+  for (let i = 0; i < innerEdges.length; i++) {
+    const next = (i + 1) % innerEdges.length;
+    const curr = innerEdges[i];
+    const nxt = innerEdges[next];
+    
+    const dx = nxt.x - curr.x;
+    const dy = nxt.y - curr.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const px = -dy / len * 10;
+    const py = dx / len * 10;
+    
+    ctx.fillStyle = i % 2 === 0 ? '#cc2222' : '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(curr.x + px, curr.y + py);
+    ctx.lineTo(nxt.x + px, nxt.y + py);
+    ctx.lineTo(nxt.x - px, nxt.y - py);
+    ctx.lineTo(curr.x - px, curr.y - py);
+    ctx.closePath();
+    ctx.fill();
+  }
+  
+  // Draw center line (dashed)
+  ctx.setLineDash([12, 12]);
+  ctx.strokeStyle = 'rgba(150, 150, 150, 0.5)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < trackWaypoints.length; i++) {
+    if (i === 0) ctx.moveTo(trackWaypoints[i].x, trackWaypoints[i].y);
+    else ctx.lineTo(trackWaypoints[i].x, trackWaypoints[i].y);
+  }
+  ctx.closePath();
+  ctx.stroke();
+  ctx.setLineDash([]);
+  
+  // Draw start/finish line
+  const start = trackWaypoints[0];
+  const nextWP = trackWaypoints[1];
+  const startAngle = Math.atan2(nextWP.y - start.y, nextWP.x - start.x);
+  const perpAngle = startAngle + Math.PI / 2;
+  
+  // Checkered pattern
+  const segments = 10;
+  for (let i = 0; i < segments; i++) {
+    const t = (i / segments - 0.5) * 2;
+    const cx = start.x + Math.cos(perpAngle) * t * HALF_TRACK;
+    const cy = start.y + Math.sin(perpAngle) * t * HALF_TRACK;
+    
+    ctx.fillStyle = i % 2 === 0 ? '#000' : '#fff';
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(perpAngle - Math.PI / 2);
+    ctx.fillRect(-6, -6, 12, 12);
+    ctx.restore();
+  }
+  
+  ctx.restore();
+}
+
+function drawCar(car) {
+  // Interpolated position
+  const t = car._interpolationFactor || 0;
+  const x = car.prevX + (car.x - car.prevX) * t;
+  const y = car.prevY + (car.y - car.prevY) * t;
+  const angle = car.prevAngle + (car.angle - car.prevAngle) * t;
+  
+  ctx.save();
+  ctx.translate(x - camera.x, y - camera.y);
+  ctx.rotate(angle);
+  
+  // Shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  ctx.fillRect(-car.width / 2 + 3, -car.height / 2 + 3, car.width, car.height);
+  
+  // Car body
+  ctx.fillStyle = car.color;
+  ctx.fillRect(-car.width / 2, -car.height / 2, car.width, car.height);
+  
+  // Car outline
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(-car.width / 2, -car.height / 2, car.width, car.height);
+  
+  // Front indicator (windshield)
+  ctx.fillStyle = 'rgba(136, 204, 255, 0.8)';
+  ctx.fillRect(car.width / 2 - 10, -car.height / 2 + 3, 7, car.height - 6);
+  
+  // Roof detail
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+  ctx.fillRect(-5, -car.height / 2 + 2, 10, car.height - 4);
+  
+  // Wheels
+  ctx.fillStyle = '#1a1a1a';
+  // Front wheels
+  ctx.fillRect(car.width / 2 - 9, -car.height / 2 - 3, 7, 3);
+  ctx.fillRect(car.width / 2 - 9, car.height / 2, 7, 3);
+  // Rear wheels
+  ctx.fillRect(-car.width / 2 + 2, -car.height / 2 - 3, 7, 3);
+  ctx.fillRect(-car.width / 2 + 2, car.height / 2, 7, 3);
+  
+  ctx.restore();
+}
+
+function drawCountdown() {
+  if (gameState !== 'countdown') return;
+  
+  const num = Math.ceil(countdownTimer);
+  const text = num > 0 ? num.toString() : 'GO!';
+  const alpha = 0.6 + (countdownTimer % 1) * 0.4;
+  
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = 'bold 130px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = num > 0 ? '#fff' : '#00ff00';
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 8;
+  ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+  ctx.restore();
+}
+
+function drawFinishMessage() {
+  if (gameState !== 'finished') return;
+  
+  const positions = calculatePositions(cars);
+  const playerPos = getCarPosition(player, positions);
+  
+  ctx.save();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+  ctx.fillRect(canvas.width / 2 - 280, canvas.height / 2 - 140, 560, 280);
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(canvas.width / 2 - 280, canvas.height / 2 - 140, 560, 280);
+  
+  ctx.font = 'bold 64px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = playerPos === 1 ? '#FFD700' : '#fff';
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 4;
+  const msg = playerPos === 1 ? 'YOU WIN!' : `FINISHED ${playerPos}/4`;
+  ctx.strokeText(msg, canvas.width / 2, canvas.height / 2 - 60);
+  ctx.fillText(msg, canvas.width / 2, canvas.height / 2 - 60);
+  
+  ctx.font = '24px monospace';
+  ctx.fillStyle = '#aaa';
+  ctx.fillText(`Total Time: ${formatTime(player.totalRaceTime)}`, canvas.width / 2, canvas.height / 2 + 10);
+  
+  if (player.bestLapTime < Infinity) {
+    ctx.fillStyle = '#0f0';
+    ctx.fillText(`Best Lap: ${formatTime(player.bestLapTime)}`, canvas.width / 2, canvas.height / 2 + 45);
+  }
+  
+  ctx.font = '20px monospace';
+  ctx.fillStyle = '#888';
+  ctx.fillText('Press R to restart', canvas.width / 2, canvas.height / 2 + 90);
+  ctx.restore();
+}
+
+// ============================================================
+// GAME INITIALIZATION
+// ============================================================
+const player = createCar(280, 330, 0, '#3388ff', true);
+const aiCars = [
+  createAI(280, 390, 0, '#ff4444', 275),
+  createAI(260, 330, 0, '#44cc44', 285),
+  createAI(260, 390, 0, '#ff8800', 265),
+];
+const cars = [player, ...aiCars];
+
+// Restart handler
+document.addEventListener('keydown', (e) => {
+  if ((e.key === 'r' || e.key === 'R') && gameState === 'finished') {
+    resetRace();
+  }
+});
+
+function resetRace() {
+  // Reset player
+  player.x = 280; player.y = 330;
+  player.angle = 0;
+  player.vx = 0; player.vy = 0;
+  player.speed = 0;
+  player.laps = 0; player.currentCheckpoint = 0;
+  player.totalRaceTime = 0; player.lapStartTime = 0;
+  player.bestLapTime = Infinity;
+  player.lapTimes = [];
+  player.finished = false;
+  player.prevX = player.x; player.prevY = player.y;
+  player.prevAngle = player.angle;
+  
+  // Reset AI
+  aiCars.forEach((ai, i) => {
+    const startX = 280 - (i % 2) * 25;
+    const startY = 330 + Math.floor(i / 2) * 65;
+    ai.x = startX; ai.y = startY;
+    ai.angle = 0;
+    ai.vx = 0; ai.vy = 0;
+    ai.speed = 0;
+    ai.laps = 0; ai.currentCheckpoint = 0;
+    ai.totalRaceTime = 0; ai.lapStartTime = 0;
+    ai.bestLapTime = Infinity;
+    ai.lapTimes = [];
+    ai.finished = false;
+    ai.currentWaypoint = 1;
+    ai.prevX = ai.x; ai.prevY = ai.y;
+    ai.prevAngle = ai.angle;
+  });
+  
+  gameState = 'countdown';
+  countdownTimer = COUNTDOWN_TIME;
+  accumulator = 0;
+}
+
+// ============================================================
+// MAIN GAME LOOP
+// ============================================================
+function gameLoop(timestamp) {
+  if (!lastTime) {
+    lastTime = timestamp;
+    requestAnimationFrame(gameLoop);
+    return;
+  }
+  
+  let frameTime = (timestamp - lastTime) / 1000;
+  lastTime = timestamp;
+  
+  // Clamp frame time to prevent spiral of death
+  if (frameTime > MAX_ACCUMULATOR) frameTime = MAX_ACCUMULATOR;
+  
+  accumulator += frameTime;
+  
+  // Fixed timestep updates
+  while (accumulator >= FIXED_DT) {
+    accumulator -= FIXED_DT;
+    
+    if (gameState === 'countdown') {
+      countdownTimer -= FIXED_DT;
+      if (countdownTimer <= 0) {
+        gameState = 'racing';
+        raceStartTime = performance.now();
+      }
+    }
+    
+    if (gameState === 'racing' || gameState === 'countdown') {
+      // Update player
+      updateCar(player, keys, FIXED_DT);
+      checkLapProgress(player, FIXED_DT);
+      
+      // Update AI
+      aiCars.forEach(ai => {
+        updateAI(ai, FIXED_DT);
+      });
+      
+      // Check collisions
+      for (let i = 0; i < cars.length; i++) {
+        for (let j = i + 1; j < cars.length; j++) {
+          const collision = checkCollision(cars[i], cars[j]);
+          resolveCollision(cars[i], cars[j], collision);
+        }
+      }
+    }
+  }
+  
+  // Calculate interpolation factor
+  interpolationFactor = accumulator / FIXED_DT;
+  
+  // Update camera to follow player
+  const t = interpolationFactor;
+  const targetCamX = player.prevX + (player.x - player.prevX) * t - canvas.width / 2;
+  const targetCamY = player.prevY + (player.y - player.prevY) * t - canvas.height / 2;
+  camera.x += (targetCamX - camera.x) * 0.1;
+  camera.y += (targetCamY - camera.y) * 0.1;
+  
+  // Render
+  drawBackground();
+  drawTrack();
+  
+  // Sort cars by Y for depth effect
+  const sortedCars = [...cars].sort((a, b) => a.y - b.y);
+  sortedCars.forEach(car => drawCar(car));
+  
+  // Calculate and draw HUD
+  const positions = calculatePositions(cars);
+  drawHUD(player, positions);
+  
+  // Draw countdown/finish overlays
+  drawCountdown();
+  drawFinishMessage();
+  
+  requestAnimationFrame(gameLoop);
+}
+
+// Start the game
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>

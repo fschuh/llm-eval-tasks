@@ -1,0 +1,3 @@
+Write a JS program that implements a top‑down 2D racing prototype. Features required: player car with acceleration/braking/steering, 3 AI opponents using A* or waypoint following, lap detection, collision response with simple impulse resolution, and a HUD showing lap/time/position.
+	
+Constraints: deterministic RNG seed; fixed timestep; no external physics engines.

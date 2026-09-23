@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rotating Hexagon Physics Simulation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <canvas id="simulationCanvas" width="800" height="800"></canvas>
+        
+        <div class="control-panel" id="controlPanel">
+            <h2>Physics Controls</h2>
+            
+            <div class="control-group">
+                <label for="gravity">Gravity: <span id="gravityValue">0.5</span></label>
+                <input type="range" id="gravity" min="0" max="2" step="0.1" value="0.5">
+            </div>
+            
+            <div class="control-group">
+                <label for="friction">Friction: <span id="frictionValue">0.995</span></label>
+                <input type="range" id="friction" min="0.9" max="1" step="0.005" value="0.995">
+            </div>
+            
+            <div class="control-group">
+                <label for="elasticity">Bounce Elasticity: <span id="elasticityValue">0.85</span></label>
+                <input type="range" id="elasticity" min="0.5" max="1" step="0.05" value="0.85">
+            </div>
+            
+            <div class="control-group">
+                <label for="rotationSpeed">Rotation Speed: <span id="rotationSpeedValue">1.0</span></label>
+                <input type="range" id="rotationSpeed" min="0.5" max="3" step="0.1" value="1.0">
+            </div>
+            
+            <div class="control-group">
+                <label for="ballCount">Ball Count: <span id="ballCountValue">8</span></label>
+                <input type="range" id="ballCount" min="3" max="15" step="1" value="8">
+            </div>
+            
+            <div class="button-group">
+                <button id="resetBtn">Reset</button>
+                <button id="pauseBtn">Pause</button>
+            </div>
+        </div>
+        
+        <div class="info-panel" id="infoPanel">
+            <div>FPS: <span id="fpsDisplay">60</span></div>
+            <div>Balls: <span id="ballCountDisplay">8</span></div>
+            <div>Time: <span id="timeDisplay">00:00</span></div>
+        </div>
+    </div>
+    
+    <script src="js/physics.js"></script>
+    <script src="js/hexagon.js"></script>
+    <script src="js/ball.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

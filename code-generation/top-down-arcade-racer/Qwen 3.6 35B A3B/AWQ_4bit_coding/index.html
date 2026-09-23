@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top-Down Arcade Racer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="hud">
+            <div id="hud-left">
+                <div id="position-display">Position: 1st</div>
+                <div id="lap-display">Lap: 1/3</div>
+                <div id="lap-time-display">Lap Time: 00:00.0</div>
+            </div>
+            <div id="hud-right">
+                <div id="total-time-display">Total Time: 00:00.0</div>
+                <div id="speed-display">Speed: 0 km/h</div>
+            </div>
+        </div>
+        <div id="start-screen">
+            <h1>TOP-DOWN ARCADE RACER</h1>
+            <p>Use Arrow Keys or WASD to drive</p>
+            <p id="start-prompt">Press ENTER to Start</p>
+            <div id="race-settings">
+                <label>Race Length: 
+                    <select id="lap-count">
+                        <option value="1">1 Lap</option>
+                        <option value="3" selected>3 Laps</option>
+                        <option value="5">5 Laps</option>
+                        <option value="10">10 Laps</option>
+                    </select>
+                </label>
+            </div>
+        </div>
+        <div id="race-complete" style="display: none;">
+            <h1>RACE COMPLETE!</h1>
+            <div id="race-results"></div>
+            <p id="restart-prompt">Press ENTER to Race Again</p>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>

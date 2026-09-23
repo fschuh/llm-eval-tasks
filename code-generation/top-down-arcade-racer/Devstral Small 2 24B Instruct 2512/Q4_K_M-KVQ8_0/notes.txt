@@ -1,0 +1,9 @@
+- Initially developed with Roo Code and Llama.cpp for serving the model
+- Roo Code couldn't complete the task due to Jinja errors requiring alternate user/assistant messages, which apparently Roo Code doesn't always do
+- Restarted from scratch in Kilo Code and it was able to proceed deeper into the the task and eventually ran into the same Jinja error, but recovered after me manually stopping the task and asking it to continue
+- Kilo Code eventually was able to complete the task
+- The model had issues calling some tools such as single and multi file edits and reads but always self-recovered after retrying
+- The model wrote unit tests and performed several iterations until all tests passed, which was great to see
+- It went as far as adding a build/package system for the game
+- The resulting game is non-functional: nothing gets displayed and I see javascript errors in the logs (calling a function that doesn't exist)
+- It had great unit test coverage, but unfortunately no way to test the game end-to-end, and the index.html file (which it couldn't test) doesn't work

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Top-Down Racer</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #1c2a1d;
+    }
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+    #error {
+      position: fixed;
+      inset: 16px;
+      margin: 0;
+      padding: 16px;
+      overflow: auto;
+      color: #ffd7d7;
+      background: rgba(40, 0, 0, 0.9);
+      font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game" aria-label="Top-down racing game. Arrow keys or WASD to drive, Space for handbrake, Escape to pause."></canvas>
+  <pre id="error" hidden></pre>
+  <noscript><p style="color:#fff;font-family:sans-serif;padding:16px">This game needs JavaScript.</p></noscript>
+
+  <!-- Deterministic simulation (no DOM access; also runs headless in Node, see tests/) -->
+  <script src="src/core/dmath.js"></script>
+  <script src="src/core/rng.js"></script>
+  <script src="src/sim/track.js"></script>
+  <script src="src/sim/car.js"></script>
+  <script src="src/sim/collision.js"></script>
+  <script src="src/sim/pathfinding.js"></script>
+  <script src="src/sim/ai.js"></script>
+  <script src="src/sim/world.js"></script>
+  <!-- Browser client -->
+  <script src="src/client/input.js"></script>
+  <script src="src/client/renderer.js"></script>
+  <script src="src/client/hud.js"></script>
+  <script src="src/client/main.js"></script>
+</body>
+</html>

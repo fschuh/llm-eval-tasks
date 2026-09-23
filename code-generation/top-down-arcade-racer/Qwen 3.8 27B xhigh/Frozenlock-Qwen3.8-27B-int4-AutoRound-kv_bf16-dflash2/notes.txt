@@ -1,0 +1,9 @@
+- Developed in OpenCode
+- The output slowed down significantly likely to dflash2 issues, but it completed the task
+- The game is functional
+- The track is long and has an interesting shape with many curves, unlike the standard oval track other models normally generated
+- Good car physics and collision response
+- The car reverses correctly
+- The race ends after the last lap
+- The race standings is bit glitchy and isn't always correct
+- Overall good output that rivals SOTA models such as GPT 5.6 Sol

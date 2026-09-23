@@ -1,0 +1,23 @@
+- Developed in Claude Code
+- The game is functional
+- Beautiful track, with vegetation around track and even a grandstand
+- Two tracks
+- Very good control and collision physics, the cars skid when going too fast, with a somewhat realistic feel
+- Cars lose control when crashing hard
+- Very challenging AI - it optimizes its path, making it very difficult to beat
+- AI brakes and avoids collisions
+- Car reverse is correct
+- Car has handbrake, and leaves permanent tire marks on the track
+- Cars cast shadows
+- Race standings are functional
+- The race ends after completing all laps
+- Difficulty on the first track is really high, almost impossible to win
+- Features as described by Opus 5.5 itself:
+    - Player car: throttle, brakes, reverse, speed-sensitive steering and a handbrake. The tires have a grip limit, so the car slides when pushed too hard.
+    - 3 AI opponents: they use both A* and waypoint following. Before the race, each one plans its own racing line with A* over a map of the track, weighted by its own personality. During the race it follows that line and slows for corners. It overtakes on whichever side has room, or follows at a safe gap. If it spins, gets stuck, or loses sight of its line, it reverses out or re-plans a short route with A*.
+    - Lap detection: 36 checkpoints that must be crossed in order and in the right direction. Shortcuts, reversing back over the line, or driving the wrong way never count. Lap times are measured to a fraction of a tick.
+    - Collisions: car-vs-wall and car-vs-car, using simple impulse resolution with bounce, friction and spin. Tests check that momentum is conserved and that cars can't pass through walls even at top speed.
+    - HUD: lap, race time, current/last/best lap and position, plus live standings with time gaps, a speedometer, a minimap, start lights and a results table.
+    - Deterministic seed: all randomness comes from one seed: the procedural track, the grid order and the AI personalities. The simulation uses its own trig functions, because the browser's built-in ones can differ between engines in the last digits.
+    - Fixed timestep: the simulation always advances in exact 1/120 s steps. Drawing is smoothed between steps, so it looks right on any refresh rate.
+    - No physics engine: there's no third-party code at all.

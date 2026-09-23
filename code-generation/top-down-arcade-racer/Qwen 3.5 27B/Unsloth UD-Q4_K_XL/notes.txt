@@ -1,0 +1,3 @@
+- Developed using Roo Code
+- I tried this eval again after finding out there are specific temperature/k/p/etc settings for Qwen 3.5 27B that could have affected the results
+- In the end though, the resulting game is still non-functional (javascript error at startup)

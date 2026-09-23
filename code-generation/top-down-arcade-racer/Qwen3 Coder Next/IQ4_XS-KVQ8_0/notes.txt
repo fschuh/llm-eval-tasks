@@ -1,0 +1,4 @@
+- Developed in Roo Code using Llama.cpp to host the model.
+- The model sometimes failed some tool calls, such as write_to_file, but self-recovered after retrying the request
+- It made a lot of requests to complete the game, probably because it decided to split the game into multiple js files
+- Resulting game is non-functional (javascript error, calling non-existent function)

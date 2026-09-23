@@ -1,0 +1,4 @@
+- Developed in Kilo Code using Step 3.5 Flash (Free).
+- The model had trouble calling the write_to_file tool and had to write files using a shell command ('cat' piping the output to a file), which I found messy
+- It used similar shell commands the entire session instead of using the built-in file tools
+- It managed to implement the game to some extent though (actually better than I expected, overall better than MiniMax 2.5)

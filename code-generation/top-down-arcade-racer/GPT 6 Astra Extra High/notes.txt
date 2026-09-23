@@ -1,0 +1,12 @@
+- Developed in Codex
+- The game is functional
+- It looks beautiful, with polished track art, including zebras around the track, starting grid slot lines, grandstands and even trees and grass on the ouside
+- There is a nice looking UI on the top and bottom of the screen containing the race information
+- The cars cast shadows on the ground
+- The controls and collision physics are very responsive, though the car physics is not very realistic and feels like it slides a lot
+- The car has a handbrake that can be used for tight turns
+- Car reversing is correct
+- The cars leave permanent skid marks on the track when braking or skidding
+- The AI is pretty good and takes some skill to beat
+- The race standings are functional
+- The race ends after completing the last lap

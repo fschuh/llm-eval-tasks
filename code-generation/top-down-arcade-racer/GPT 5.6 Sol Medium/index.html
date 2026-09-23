@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#101711">
+  <title>Apex County</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="game-shell">
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">Saturday Club Series</p>
+        <h1>APEX COUNTY</h1>
+      </div>
+      <div class="status"><span class="status-light"></span> RACE CONTROL · LIVE</div>
+    </header>
+
+    <section class="game-frame" aria-label="Top-down racing game">
+      <canvas id="game" width="1280" height="780"></canvas>
+      <div class="start-card" id="startCard">
+        <p class="eyebrow">Round 04 · Three laps</p>
+        <h2>KEEP IT<br>ON THE BLACKTOP</h2>
+        <p>Arrow keys or WASD to drive. Brake before the bends.</p>
+        <button id="startButton">START ENGINE</button>
+      </div>
+      <div class="touch-controls" aria-label="Touch driving controls">
+        <button data-control="left" aria-label="Steer left">←</button>
+        <button data-control="right" aria-label="Steer right">→</button>
+        <button data-control="brake" aria-label="Brake">BRAKE</button>
+        <button data-control="accelerate" aria-label="Accelerate">GO</button>
+      </div>
+    </section>
+
+    <footer>
+      <span><b>WASD / ARROWS</b> DRIVE</span>
+      <span><b>P</b> PAUSE</span>
+      <span><b>R</b> RESTART</span>
+      <span class="seed">SIM SEED 04731</span>
+    </footer>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>

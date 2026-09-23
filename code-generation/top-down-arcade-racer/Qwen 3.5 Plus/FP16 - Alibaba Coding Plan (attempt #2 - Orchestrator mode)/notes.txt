@@ -1,0 +1,7 @@
+- Developed in Roo Code
+- This time I used Orchestrator mode, unlike the first run (where I had it in Code mode by mistake)
+- NOTE: this run should be scrapped, I believe the model was not locked and Architect/Code modes were running on Qwen 3 Coder Next, which helps explain some of the behavior below)
+- It wrote a lot of implementation code to game-architecture.md (same behavior as Qwen 3 Coder Next), which I found weird
+- At first I thought the game didn't work but you have to press space for the game to actually start
+- The resulting game runs but the controls don't work (the cars can only turn while stationary but don't accelerate in either direction)
+- The final result was actually worse than the first run where I used Code mode directly

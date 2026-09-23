@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Top-Down Racer Prototype</title>
+  <style>
+    :root {
+      --bg: #0d1b1e;
+      --panel: #132a2f;
+      --text: #d8f3dc;
+      --accent: #52b788;
+      --warn: #ffb703;
+      --danger: #fb8500;
+    }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: radial-gradient(circle at 20% 20%, #1b4332, var(--bg));
+      color: var(--text);
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    }
+
+    .wrap {
+      display: grid;
+      place-items: center;
+      min-height: 100%;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
+    canvas {
+      border: 2px solid #2d6a4f;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+      background: #0b1618;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .tips {
+      margin-top: 10px;
+      font-size: 13px;
+      opacity: 0.9;
+      text-align: center;
+    }
+
+    kbd {
+      background: var(--panel);
+      border: 1px solid #2d6a4f;
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <canvas id="game" width="960" height="640" aria-label="Top-down racing prototype"></canvas>
+    <div class="tips">
+      Controls: <kbd>W</kbd>/<kbd>S</kbd> accelerate-brake, <kbd>A</kbd>/<kbd>D</kbd> steer, <kbd>R</kbd> reset.
+    </div>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>

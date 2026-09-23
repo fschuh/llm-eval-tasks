@@ -1,0 +1,4 @@
+- Developed in Roo Code
+- This time I used Orchestrator mode, unlike the first run (where I had it in Code mode by mistake)
+- Interestingly enough, in this run it didn't create an architecture documentation file - it just created tasks for Code mode
+- The resulting game runs despite having very bad controls, no lap detection and terrible AI

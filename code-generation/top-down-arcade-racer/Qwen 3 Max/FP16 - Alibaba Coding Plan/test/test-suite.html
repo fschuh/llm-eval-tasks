@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Racing Game Test Suite</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4CAF50;
+            text-align: center;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .test-info {
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .test-info h2 {
+            margin-top: 0;
+            color: #2196F3;
+        }
+        .requirements {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .requirement {
+            background: #3a3a3a;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #FF9800;
+        }
+        .console {
+            background: #000;
+            color: #0f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #444;
+        }
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .status.running { color: #FF9800; }
+        .status.passed { color: #4CAF50; }
+        .status.failed { color: #f44336; }
+        .instructions {
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .instructions h3 {
+            color: #FF9800;
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏎️ Top-Down Racing Game Test Suite</h1>
+        
+        <div class="test-info">
+            <h2>Test Coverage</h2>
+            <p>This comprehensive test suite validates all requirements of the racing prototype:</p>
+            
+            <div class="requirements">
+                <div class="requirement">✅ Core Game Engine (60 FPS fixed timestep)</div>
+                <div class="requirement">✅ Player Car Physics (acceleration, braking, steering)</div>
+                <div class="requirement">✅ AI Opponents (waypoint following, difficulty levels)</div>
+                <div class="requirement">✅ Lap Detection (forward/backward crossing, timing)</div>
+                <div class="requirement">✅ Collision Response (impulse resolution, momentum transfer)</div>
+                <div class="requirement">✅ HUD System (lap/time/position display, countdown)</div>
+                <div class="requirement">✅ Deterministic RNG (reproducible results)</div>
+                <div class="requirement">✅ Integration & Performance (complete game flow)</div>
+            </div>
+        </div>
+        
+        <div class="status running" id="status">🔄 Tests are running...</div>
+        
+        <div class="console" id="console"></div>
+        
+        <div class="instructions">
+            <h3>How to Use This Test Suite</h3>
+            <ul>
+                <li><strong>Automated Testing</strong>: All tests run automatically when this page loads</li>
+                <li><strong>Manual Testing</strong>: The game can also be tested manually at <a href="../index.html" target="_blank">localhost:8081</a></li>
+                <li><strong>Node.js Testing</strong>: Some tests can be run in Node.js using <code>node test/node-deterministic-test.js</code></li>
+                <li><strong>Browser Requirements</strong>: Modern browser with ES6+ support and Canvas API</li>
+            </ul>
+            <p><strong>Note:</strong> Tests require the development server to be running on localhost:8081</p>
+        </div>
+    </div>
+
+    <script type="module">
+        // Capture console output
+        const originalLog = console.log;
+        const consoleElement = document.getElementById('console');
+        const statusElement = document.getElementById('status');
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+            consoleElement.innerHTML += message + '\n';
+            consoleElement.scrollTop = consoleElement.scrollHeight;
+        };
+        
+        // Import and run test suite
+        import { TestRunner } from './test-runner.js';
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const runner = new TestRunner();
+                const allPassed = await runner.runAllTests();
+                
+                if (allPassed) {
+                    statusElement.className = 'status passed';
+                    statusElement.textContent = '🎉 ALL TESTS PASSED! The racing prototype meets all requirements.';
+                } else {
+                    statusElement.className = 'status failed';
+                    statusElement.textContent = '⚠️ SOME TESTS FAILED! Please review the console output above.';
+                }
+            } catch (error) {
+                statusElement.className = 'status failed';
+                statusElement.textContent = '💥 TEST SUITE ERROR!';
+                console.log('Test suite error:', error);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Deterministic Top-Down Racer</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="stage">
+        <canvas id="game" width="1280" height="800" aria-label="Top-down racing prototype"></canvas>
+      </section>
+      <aside class="info">
+        <h1>Top-Down 2D Racing Prototype</h1>
+        <p>Controls: <span>W / Up</span> accelerate, <span>S / Down</span> brake or reverse, <span>A D / Left Right</span> steer.</p>
+        <p>Simulation: fixed timestep, deterministic seeded setup, waypoint-following AI, lap counting, and impulse collisions.</p>
+        <p>Seed: pass <code>?seed=1337</code> in the URL to reproduce the same AI tuning and starting behavior.</p>
+      </aside>
+    </main>
+    <script src="./game.js"></script>
+  </body>
+</html>

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Top-Down Racing Prototype</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <canvas id="game" aria-label="Top-down arcade racing prototype"></canvas>
+
+    <aside id="hud" class="hud" aria-label="Race HUD">
+      <div class="hud__stat">
+        <span class="hud__label">Lap</span>
+        <strong id="lapValue">1/3</strong>
+      </div>
+      <div class="hud__stat">
+        <span class="hud__label">Time</span>
+        <strong id="timeValue">00:00.000</strong>
+      </div>
+      <div class="hud__stat">
+        <span class="hud__label">Position</span>
+        <strong id="positionValue">1st</strong>
+      </div>
+      <div id="standings" class="standings"></div>
+    </aside>
+
+    <script src="game.js"></script>
+  </body>
+</html>

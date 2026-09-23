@@ -1,0 +1,3 @@
+- Developed in RooCode Visual Studio extension
+- The resulting game looks very good, has responsive physics, and AI that is able to complete laps, and the player controls are almost fully working except turning right is somewhat broken (need to stop the car before it can start turning)
+- This is the best result for a model this size so far - close to the result of frontier models such as Gemini 3.1 Pro and GPT 5.4, if not for the partially broken player controls

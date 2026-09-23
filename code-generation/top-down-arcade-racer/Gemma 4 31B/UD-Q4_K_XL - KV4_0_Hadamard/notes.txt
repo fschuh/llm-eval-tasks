@@ -1,0 +1,3 @@
+- Developed using Roo Code
+- The game works and has wonky controls and no collision detection
+- Still impressive that it runs with no errors - so it was better than Qwen 3.5 27B in that regard

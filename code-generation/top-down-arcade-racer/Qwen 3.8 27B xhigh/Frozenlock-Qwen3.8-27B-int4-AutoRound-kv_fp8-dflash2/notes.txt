@@ -1,0 +1,11 @@
+- Developed in OpenCode
+- Took quite a while to complete the task, about 1 hour or more
+    - The dflash2 generation speed was not consistent, sometimes it slowed down 
+- The game is functional
+- This one turned out quite different from the other quant options of Qwen 3.8 27B xhigh, though I did update the Club 3090 repo prior to running it again (it had failed before due to dflash2 bugs)
+- The controls are good and the collision physics is very responsive
+- Reversing the car is correct
+- Functional UI, including a minimap with the positions of the cars updated in real time (though it's not the prettiest and the dots are not perfectly aligned to the minimap track)
+- The race ends after completing all laps
+- Race standings don't work properly
+- BUG: during countdown prior to race start, all cars start moving backwards. The same happens when completing the race

@@ -1,0 +1,3 @@
+- Developed using Roo Code
+- The model tested the game using a browser, but it doesn't have vision capabilties and wasn't able to notice that it wasn't really working
+- The resulting game is non-functional (javascript errors)

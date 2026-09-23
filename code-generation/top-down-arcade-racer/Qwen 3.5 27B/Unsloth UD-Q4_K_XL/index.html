@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top-Down Arcade Racer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        #gameContainer {
+            position: relative;
+        }
+        #gameCanvas {
+            border: 4px solid #333;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 100, 255, 0.3);
+        }
+        #instructions {
+            position: absolute;
+            bottom: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #888;
+            font-size: 14px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="instructions">WASD / Arrow Keys: Accelerate, Brake, Steer | Space: Restart</div>
+    </div>
+
+    <script>
+    // ============================================
+    // 1. Vector2D Class - 2D Vector Math
+    // ============================================
+    class Vector2 {
+        constructor(x = 0, y = 0) {
+            this.x = x;
+            this.y = y;
+        }
+
+        copy(vector) {
+            this.x = vector.x;
+            this.y = vector.y;
+            return this;
+        }
+
+        add(vector) {
+            this.x += vector.x;
+            this.y += vector.y;
+            return this;
+        }
+
+        subtract(vector) {
+            this.x -= vector.x;
+            this.y -= vector.y;
+            return this;
+        }
+
+        multiply(scalar) {
+            this.x *= scalar;
+            this.y *= scalar;
+            return this;
+        }
+
+        divide(scalar) {
+            if (scalar !== 0) {
+                this.x /= scalar;
+                this.y /= scalar;
+            }
+            return this;
+        }
+
+        scale(scalar) {
+            return new Vector2(this.x * scalar, this.y * scalar);
+        }
+
+        dot(vector) {
+            return this.x * vector.x + this.y * vector.y;
+        }
+
+        cross(vector) {
+            return this.x * vector.y - this.y * vector.x;
+        }
+
+        length() {
+            return Math.sqrt(this.x * this.x + this.y * this.y);
+        }
+
+        lengthSquared() {
+            return this.x * this.x + this.y * this.y;
+        }
+
+        normalize() {
+            const len = this.length();
+            if (len > 0) {
+                this.divide(len);
+            }
+            return this;
+        }
+
+        normalized() {
+            const len = this.length();
+            if (len > 0) {
+                return new Vector2(this.x / len, this.y / len);
+            }
+            return new Vector2(0, 0);
+        }
+
+        distanceTo(vector) {
+            const dx = vector.x - this.x;
+            const dy = vector.y - this.y;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        static lerp(a, b, t) {
+            return new Vector2(
+                a.x + (b.x - a.x) * t,
+                a.y + (b.y - a.y) * t
+            );
+        }
+
+        static zero() {
+            return new Vector2(0, 0);
+        }
+
+        clone() {
+            return new Vector2(this.x, this.y);
+        }
+    }
+
+    // ============================================
+    // 2. Deterministic RNG - Mulberry32 Algorithm
+    // ============================================
+    class SeededRandom {
+        constructor(seed) {
+            this.seed = seed;
+            this.state = seed >>> 0;
+        }
+
+        // Mulberry32 algorithm
+        next() {
+            let t = (this.state += 0x6D2B79F5) >>> 0;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        }
+
+        reset() {
+            this.state = this.seed >>> 0;
+        }
+
+        nextInt(min, max) {
+            return Math.floor(this.next() * (max - min + 1)) + min;
+        }
+
+        nextFloat(min, max) {
+            return this.next() * (max - min) + min;
+        }
+
+        spawn() {
+            return new SeededRandom(this.nextInt(0, 0xFFFFFFFF));
+        }
+    }
+
+    // ============================================
+    // 3. Game Loop - Fixed Timestep (60 FPS)
+    // ============================================
+    const FIXED_TIMESTEP = 16.67; // 60 FPS = 16.67ms per frame
+    const MAX_CATCHUP = 5;
+
+    class GameLoop {
+        constructor(game) {
+            this.game = game;
+            this.lastTime = 0;
+            this.accumulator = 0;
+            this.fixedTimestep = FIXED_TIMESTEP;
+            this.isRunning = false;
+            this.animationFrameId = null;
+        }
+
+        start() {
+            this.lastTime = performance.now();
+            this.isRunning = true;
+            this.loop();
+        }
+
+        loop() {
+            if (!this.isRunning) return;
+
+            const currentTime = performance.now();
+            const deltaTime = currentTime - this.lastTime;
+            this.lastTime = currentTime;
+
+            // Accumulate time
+            this.accumulator += deltaTime;
+
+            // Fixed timestep updates (physics, game logic)
+            let catchupCount = 0;
+            while (this.accumulator >= this.fixedTimestep && catchupCount < MAX_CATCHUP) {
+                this.game.update(this.fixedTimestep);
+                this.accumulator -= this.fixedTimestep;
+                catchupCount++;
+            }
+
+            // Interpolation for rendering
+            const interpolationAlpha = this.accumulator / this.fixedTimestep;
+            this.game.render(interpolationAlpha);
+
+            this.animationFrameId = requestAnimationFrame(() => this.loop());
+        }
+
+        stop() {
+            this.isRunning = false;
+            if (this.animationFrameId) {
+                cancelAnimationFrame(this.animationFrameId);
+            }
+        }
+    }
+
+    // ============================================
+    // 4. Entity-Component-System Architecture
+    // ============================================
+    class Entity {
+        constructor(id) {
+            this.id = id;
+            this.components = new Map();
+            this.isActive = true;
+        }
+
+        addComponent(component) {
+            this.components.set(component.type, component);
+        }
+
+        getComponent(type) {
+            return this.components.get(type);
+        }
+
+        hasComponent(type) {
+            return this.components.has(type);
+        }
+
+        removeComponent(type) {
+            this.components.delete(type);
+        }
+
+        destroy() {
+            this.isActive = false;
+        }
+    }
+
+    class EntityManager {
+        constructor() {
+            this.entities = new Map();
+            this.nextId = 0;
+            this.entityPool = [];
+        }
+
+        create() {
+            let entity;
+            if (this.entityPool.length > 0) {
+                entity = this.entityPool.pop();
+                entity.isActive = true;
+                entity.components.clear();
+            } else {
+                entity = new Entity(this.nextId++);
+            }
+            this.entities.set(entity.id, entity);
+            return entity;
+        }
+
+        get(id) {
+            return this.entities.get(id);
+        }
+
+        destroy(entity) {
+            entity.destroy();
+            this.entityPool.push(entity);
+        }
+
+        getActiveEntities() {
+            return Array.from(this.entities.values()).filter(e => e.isActive);
+        }
+
+        getEntitiesWithComponent(type) {
+            return this.getActiveEntities().filter(e => e.hasComponent(type));
+        }
+    }
+
+    // ============================================
+    // 5. Component Definitions
+    // ============================================
+    class TransformComponent {
+        constructor(x = 0, y = 0, rotation = 0, scale = 1) {
+            this.type = 'Transform';
+            this.position = new Vector2(x, y);
+            this.rotation = rotation;
+            this.scale = scale;
+            this.previousPosition = new Vector2(x, y);
+            this.previousRotation = rotation;
+        }
+    }
+
+    class VelocityComponent {
+        constructor(velocity = null, angularVelocity = 0) {
+            this.type = 'Velocity';
+            this.velocity = velocity || new Vector2(0, 0);
+            this.angularVelocity = angularVelocity;
+        }
+    }
+
+    class ColliderComponent {
+        constructor(radius = 1, layers = 1) {
+            this.type = 'Collider';
+            this.radius = radius;
+            this.layers = layers;
+            this.isTrigger = false;
+        }
+    }
+
+    class RigidbodyComponent {
+        constructor(mass = 1, friction = 0.01, maxSpeed = 10) {
+            this.type = 'Rigidbody';
+            this.mass = mass;
+            this.friction = friction;
+            this.maxSpeed = maxSpeed;
+            this.isKinematic = false;
+        }
+    }
+
+    class CarComponent {
+        constructor(acceleration = 0.5, brakingForce = 0.8, turnSpeed = 0.05, maxSpeed = 15) {
+            this.type = 'Car';
+            this.acceleration = acceleration;
+            this.brakingForce = brakingForce;
+            this.turnSpeed = turnSpeed;
+            this.maxSpeed = maxSpeed;
+            this.currentSpeed = 0;
+        }
+    }
+
+    class PlayerComponent {
+        constructor(playerId = 0) {
+            this.type = 'Player';
+            this.playerId = playerId;
+            this.position = 0;
+            this.currentLap = 0;
+            this.bestLapTime = Infinity;
+            this.totalTime = 0;
+            this.hasFinished = false;
+        }
+    }
+
+    class AIComponent {
+        constructor(waypointIndex = 0, difficulty = 'medium') {
+            this.type = 'AI';
+            this.waypointIndex = 0;
+            this.difficulty = difficulty;
+            this.currentLap = 0;
+            this.targetSpeed = 12;
+            this.reactionTime = 0;
+        }
+    }
+
+    class RendererComponent {
+        constructor(color = '#ff0000', sprite = null) {
+            this.type = 'Renderer';
+            this.color = color;
+            this.sprite = sprite;
+            this.drawOrder = 0;
+        }
+    }
+
+    class CheckpointComponent {
+        constructor(checkpointId = 0) {
+            this.type = 'Checkpoint';
+            this.checkpointId = checkpointId;
+        }
+    }
+
+    // ============================================
+    // 6. System Base Class
+    // ============================================
+    class System {
+        constructor() {
+            this.requiredComponents = [];
+        }
+
+        update(deltaTime, entities) {
+            // Override in subclass
+        }
+
+        getMatchingEntities(entityManager) {
+            return entityManager.getActiveEntities().filter(entity => {
+                return this.requiredComponents.every(type => 
+                    entity.hasComponent(type)
+                );
+            });
+        }
+    }
+
+    // ============================================
+    // 7. Physics System - Collision Detection & Resolution
+    // ============================================
+    class PhysicsSystem extends System {
+        constructor() {
+            super();
+            this.requiredComponents = ['Transform', 'Collider', 'Rigidbody'];
+            this.restitution = 0.5;
+            this.friction = 0.3;
+        }
+
+        update(deltaTime, entityManager) {
+            const entities = this.getMatchingEntities(entityManager);
+
+            // Update positions based on velocity
+            for (const entity of entities) {
+                const transform = entity.getComponent('Transform');
+                const velocity = entity.getComponent('Velocity');
+                const rigidbody = entity.getComponent('Rigidbody');
+
+                if (rigidbody.isKinematic) continue;
+
+                // Store previous position for interpolation
+                transform.previousPosition.copy(transform.position);
+                transform.previousRotation = transform.rotation;
+
+                // Apply velocity
+                transform.position.add(velocity.velocity.scale(deltaTime / 1000));
+                transform.rotation += velocity.angularVelocity * (deltaTime / 1000);
+
+                // Apply friction
+                velocity.velocity.scale(1 - rigidbody.friction);
+
+                // Clamp to max speed
+                if (velocity.velocity.length() > rigidbody.maxSpeed) {
+                    velocity.velocity.normalize();
+                    velocity.velocity.scale(rigidbody.maxSpeed);
+                }
+            }
+
+            // Detect and resolve collisions
+            this.resolveCollisions(entities);
+        }
+
+        resolveCollisions(entities) {
+            for (let i = 0; i < entities.length; i++) {
+                for (let j = i + 1; j < entities.length; j++) {
+                    const entityA = entities[i];
+                    const entityB = entities[j];
+
+                    const colliderA = entityA.getComponent('Collider');
+                    const colliderB = entityB.getComponent('Collider');
+                    const transformA = entityA.getComponent('Transform');
+                    const transformB = entityB.getComponent('Transform');
+
+                    // Check collision layer masks
+                    if ((colliderA.layers & colliderB.layers) === 0) continue;
+
+                    // Circle-circle collision detection
+                    const collision = this.checkCircleCollision(
+                        transformA.position, colliderA.radius,
+                        transformB.position, colliderB.radius
+                    );
+
+                    if (collision) {
+                        this.resolveCollision(entityA, entityB, collision);
+                    }
+                }
+            }
+        }
+
+        checkCircleCollision(posA, radiusA, posB, radiusB) {
+            const distance = posA.distanceTo(posB);
+            const minDistance = radiusA + radiusB;
+
+            if (distance < minDistance && distance > 0) {
+                const normal = posB.subtract(posA).normalize();
+                const penetration = minDistance - distance;
+                return { normal, penetration, distance };
+            }
+            return null;
+        }
+
+        resolveCollision(entityA, entityB, collision) {
+            const rigidbodyA = entityA.getComponent('Rigidbody');
+            const rigidbodyB = entityB.getComponent('Rigidbody');
+            const velocityA = entityA.getComponent('Velocity');
+            const velocityB = entityB.getComponent('Velocity');
+            const transformA = entityA.getComponent('Transform');
+            const transformB = entityB.getComponent('Transform');
+
+            // Skip if both are kinematic
+            if (rigidbodyA.isKinematic && rigidbodyB.isKinematic) return;
+
+            // Separate circles to resolve penetration
+            const totalMass = rigidbodyA.mass + rigidbodyB.mass;
+            const separationA = collision.penetration * (rigidbodyB.mass / totalMass);
+            const separationB = collision.penetration * (rigidbodyA.mass / totalMass);
+
+            if (!rigidbodyA.isKinematic) {
+                transformA.position.add(collision.normal.scale(separationA));
+            }
+            if (!rigidbodyB.isKinematic) {
+                transformB.position.subtract(collision.normal.scale(separationB));
+            }
+
+            // Impulse-based collision response
+            const relativeVelocity = velocityA.velocity.clone().subtract(velocityB.velocity);
+            const velocityAlongNormal = relativeVelocity.dot(collision.normal);
+
+            // Don't resolve if velocities are separating
+            if (velocityAlongNormal > 0) return;
+
+            // Calculate impulse scalar
+            let impulseScalar = -(1 + this.restitution) * velocityAlongNormal;
+            impulseScalar /= (1 / rigidbodyA.mass + 1 / rigidbodyB.mass);
+
+            // Calculate friction impulse
+            const tangent = relativeVelocity.clone()
+                .subtract(collision.normal.scale(velocityAlongNormal))
+                .normalize();
+
+            let frictionImpulse = -relativeVelocity.dot(tangent);
+            frictionImpulse /= (1 / rigidbodyA.mass + 1 / rigidbodyB.mass);
+
+            // Clamp friction impulse (Coulomb friction)
+            const normalImpulse = impulseScalar;
+            const maxFriction = normalImpulse * this.friction;
+            frictionImpulse = Math.max(-maxFriction, Math.min(maxFriction, frictionImpulse));
+
+            // Apply impulses
+            const normalImpulseVector = collision.normal.scale(impulseScalar);
+            const frictionImpulseVector = tangent.scale(frictionImpulse);
+            const totalImpulse = normalImpulseVector.clone().add(frictionImpulseVector);
+
+            if (!rigidbodyA.isKinematic) {
+                velocityA.velocity.add(totalImpulse.scale(1 / rigidbodyA.mass));
+            }
+            if (!rigidbodyB.isKinematic) {
+                velocityB.velocity.subtract(totalImpulse.scale(1 / rigidbodyB.mass));
+            }
+        }
+    }
+
+    // ============================================
+    // 8. Car Control System
+    // ============================================
+    class CarControlSystem extends System {
+        constructor() {
+            super();
+            this.requiredComponents = ['Transform', 'Velocity', 'Car'];
+        }
+
+        update(deltaTime, entityManager, input) {
+            const entities = this.getMatchingEntities(entityManager);
+
+            for (const entity of entities) {
+                const transform = entity.getComponent('Transform');
+                const velocity = entity.getComponent('Velocity');
+                const car = entity.getComponent('Car');
+                const player = entity.getComponent('Player');
+                const ai = entity.getComponent('AI');
+
+                if (player) {
+                    // Player control
+                    this.handlePlayerInput(car, velocity, transform, input);
+                }
+
+                // Apply car physics
+                this.applyCarPhysics(car, velocity, transform, deltaTime);
+            }
+        }
+
+        handlePlayerInput(car, velocity, transform, input) {
+            // Acceleration
+            if (input.keys['ArrowUp'] || input.keys['w'] || input.keys['W']) {
+                car.currentSpeed += car.acceleration;
+            }
+            if (input.keys['ArrowDown'] || input.keys['s'] || input.keys['S']) {
+                car.currentSpeed -= car.brakingForce;
+            }
+
+            // Steering (only when moving)
+            if (Math.abs(car.currentSpeed) > 0.1) {
+                const turnDirection = car.currentSpeed > 0 ? 1 : -1;
+                if (input.keys['ArrowLeft'] || input.keys['a'] || input.keys['A']) {
+                    transform.rotation -= car.turnSpeed * turnDirection;
+                }
+                if (input.keys['ArrowRight'] || input.keys['d'] || input.keys['D']) {
+                    transform.rotation += car.turnSpeed * turnDirection;
+                }
+            }
+
+            // Clamp speed
+            car.currentSpeed = Math.max(-car.maxSpeed / 2, Math.min(car.maxSpeed, car.currentSpeed));
+        }
+
+        applyCarPhysics(car, velocity, transform, deltaTime) {
+            // Convert car speed to velocity vector based on rotation
+            const forward = new Vector2(Math.cos(transform.rotation), Math.sin(transform.rotation));
+            velocity.velocity.copy(forward.scale(car.currentSpeed));
+        }
+    }
+
+    // ============================================
+    // 9. Track System
+    // ============================================
+    class Track {
+        constructor(waypoints, checkpoints) {
+            this.waypoints = waypoints;
+            this.checkpoints = checkpoints;
+            this.startLine = null;
+        }
+
+        static fromDefinition(trackDefinition) {
+            const waypoints = trackDefinition.waypoints.map(wp => 
+                new Vector2(wp.x, wp.y)
+            );
+            const checkpoints = trackDefinition.checkpoints.map(cp => ({
+                id: cp.id,
+                position: new Vector2(cp.x, cp.y),
+                triggerRadius: cp.radius || 50
+            }));
+
+            return new Track(waypoints, checkpoints);
+        }
+
+        getWaypoint(index) {
+            return this.waypoints[index % this.waypoints.length];
+        }
+
+        getNextWaypointIndex(currentIndex) {
+            return (currentIndex + 1) % this.waypoints.length;
+        }
+
+        getNextWaypoint(currentIndex) {
+            return this.getWaypoint(this.getNextWaypointIndex(currentIndex));
+        }
+
+        getPreviousWaypointIndex(currentIndex) {
+            return (currentIndex - 1 + this.waypoints.length) % this.waypoints.length;
+        }
+
+        getNearestCheckpoint(position) {
+            let nearest = null;
+            let nearestDistance = Infinity;
+
+            for (const checkpoint of this.checkpoints) {
+                const distance = position.distanceTo(checkpoint.position);
+                if (distance < nearestDistance) {
+                    nearestDistance = distance;
+                    nearest = checkpoint;
+                }
+            }
+
+            return nearest;
+        }
+
+        isWithinCheckpoint(position, checkpointId) {
+            const checkpoint = this.checkpoints.find(cp => cp.id === checkpointId);
+            if (!checkpoint) return false;
+
+            return position.distanceTo(checkpoint.position) < checkpoint.triggerRadius;
+        }
+
+        render(ctx) {
+            // Draw track surface
+            ctx.fillStyle = '#2a2a3e';
+            ctx.beginPath();
+            this.drawTrackPath(ctx);
+            ctx.fill();
+
+            // Draw track border
+            ctx.strokeStyle = '#4a4a6e';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            // Draw waypoints (debug)
+            ctx.strokeStyle = 'rgba(0, 255, 0, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+
+            ctx.beginPath();
+            for (let i = 0; i < this.waypoints.length; i++) {
+                const wp = this.waypoints[i];
+                const nextWp = this.waypoints[(i + 1) % this.waypoints.length];
+
+                if (i === 0) {
+                    ctx.moveTo(wp.x, wp.y);
+                }
+                ctx.lineTo(nextWp.x, nextWp.y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw checkpoints
+            for (const checkpoint of this.checkpoints) {
+                ctx.fillStyle = `hsla(${checkpoint.id * 60}, 100%, 50%, 0.2)`;
+                ctx.beginPath();
+                ctx.arc(checkpoint.position.x, checkpoint.position.y, checkpoint.triggerRadius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`CP ${checkpoint.id}`, checkpoint.position.x, checkpoint.position.y);
+            }
+
+            // Draw start/finish line
+            if (this.startLine) {
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 4;
+                ctx.setLineDash([10, 5]);
+                ctx.beginPath();
+                ctx.moveTo(this.startLine.x, this.startLine.y - 30);
+                ctx.lineTo(this.startLine.x, this.startLine.y + 30);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Checkered pattern
+                const checkerSize = 5;
+                for (let i = -3; i <= 3; i++) {
+                    ctx.fillStyle = i % 2 === 0 ? '#000000' : '#ffffff';
+                    ctx.fillRect(this.startLine.x - 15 + i * checkerSize, this.startLine.y - 20, checkerSize, 40);
+                }
+            }
+        }
+
+        drawTrackPath(ctx) {
+            // Draw a wider track path
+            const trackWidth = 80;
+            
+            // Create outer path
+            ctx.beginPath();
+            for (let i = 0; i < this.waypoints.length; i++) {
+                const wp = this.waypoints[i];
+                const nextWp = this.waypoints[(i + 1) % this.waypoints.length];
+                
+                if (i === 0) {
+                    ctx.moveTo(wp.x, wp.y);
+                }
+                ctx.lineTo(nextWp.x, nextWp.y);
+            }
+            ctx.closePath();
+            
+            // Create inner path (offset)
+            const innerPath = ctx.createPath();
+            for (let i = 0; i < this.waypoints.length; i++) {
+                const wp = this.waypoints[i];
+                const prevWp = this.waypoints[(i - 1 + this.waypoints.length) % this.waypoints.length];
+                const nextWp = this.waypoints[(i + 1) % this.waypoints.length];
+                
+                const prevDir = wp.clone().subtract(prevWp).normalize();
+                const nextDir = nextWp.clone().subtract(wp).normalize();
+                const avgDir = prevDir.clone().add(nextDir).normalize();
+                const offset = avgDir.scale(-trackWidth / 2);
+                
+                if (i === 0) {
+                    ctx.moveTo(wp.x + offset.x, wp.y + offset.y);
+                } else {
+                    ctx.lineTo(wp.x + offset.x, wp.y + offset.y);
+                }
+            }
+            ctx.closePath();
+        }
+    }
+
+    // ============================================
+    // 10. Waypoint Navigator
+    // ============================================
+    class WaypointNavigator {
+        constructor(track) {
+            this.track = track;
+            this.currentWaypointIndex = 0;
+            this.reachedWaypoints = 0;
+        }
+
+        update(position, deltaTime) {
+            const targetWaypoint = this.track.getWaypoint(this.currentWaypointIndex);
+            const distance = position.distanceTo(targetWaypoint);
+
+            // Check if waypoint is reached
+            if (distance < 30) {
+                this.currentWaypointIndex = this.track.getNextWaypointIndex(this.currentWaypointIndex);
+                this.reachedWaypoints++;
+
+                // Check for lap completion
+                if (this.reachedWaypoints >= this.track.waypoints.length) {
+                    this.reachedWaypoints = 0;
+                    return { lapCompleted: true };
+                }
+            }
+
+            return { lapCompleted: false };
+        }
+
+        getTargetDirection(position) {
+            const targetWaypoint = this.track.getWaypoint(this.currentWaypointIndex);
+            return targetWaypoint.subtract(position).normalize();
+        }
+
+        getDistanceToTarget(position) {
+            const targetWaypoint = this.track.getWaypoint(this.currentWaypointIndex);
+            return position.distanceTo(targetWaypoint);
+        }
+
+        getCurrentWaypoint() {
+            return this.track.getWaypoint(this.currentWaypointIndex);
+        }
+
+        reset() {
+            this.currentWaypointIndex = 0;
+            this.reachedWaypoints = 0;
+        }
+    }
+
+    // ============================================
+    // 11. AI Controller
+    // ============================================
+    class AIController {
+        constructor(entity, track, difficulty = 'medium', rng) {
+            this.entity = entity;
+            this.track = track;
+            this.difficulty = difficulty;
+            this.rng = rng;
+
+            this.config = this.getDifficultyConfig(difficulty);
+            this.navigator = new WaypointNavigator(track);
+            this.steerAngle = 0;
+            this.targetSpeed = this.config.maxSpeed;
+        }
+
+        getDifficultyConfig(difficulty) {
+            const configs = {
+                easy: {
+                    maxSpeed: 10,
+                    reactionTime: 0.1,
+                    steerSmoothness: 0.05,
+                    collisionAvoidanceRadius: 80,
+                    variability: 0.2
+                },
+                medium: {
+                    maxSpeed: 12,
+                    reactionTime: 0.08,
+                    steerSmoothness: 0.08,
+                    collisionAvoidanceRadius: 60,
+                    variability: 0.1
+                },
+                hard: {
+                    maxSpeed: 14,
+                    reactionTime: 0.05,
+                    steerSmoothness: 0.12,
+                    collisionAvoidanceRadius: 50,
+                    variability: 0.05
+                }
+            };
+            return configs[difficulty] || configs.medium;
+        }
+
+        update(deltaTime, allEntities) {
+            const transform = this.entity.getComponent('Transform');
+            const car = this.entity.getComponent('Car');
+
+            // Update waypoint navigation
+            const navResult = this.navigator.update(transform.position, deltaTime);
+
+            if (navResult.lapCompleted) {
+                this.handleLapComplete();
+            }
+
+            // Calculate steering towards waypoint
+            const targetDirection = this.navigator.getTargetDirection(transform.position);
+            const targetRotation = Math.atan2(targetDirection.y, targetDirection.x);
+
+            // Smooth steering
+            const angleDiff = this.normalizeAngle(targetRotation - transform.rotation);
+            this.steerAngle = angleDiff * this.config.steerSmoothness;
+
+            // Add some variability for natural movement
+            this.steerAngle += (this.rng.next() - 0.5) * this.config.variability;
+
+            // Apply steering
+            transform.rotation += this.steerAngle;
+
+            // Speed control
+            const distanceToTarget = this.navigator.getDistanceToTarget(transform.position);
+
+            // Slow down for tight turns
+            const turnSharpness = this.getTurnSharpness();
+            const adjustedTargetSpeed = this.config.maxSpeed * (1 - turnSharpness * 0.3);
+
+            if (distanceToTarget > 100) {
+                car.currentSpeed += car.acceleration * 0.9;
+            } else {
+                car.currentSpeed *= 0.98;
+            }
+
+            // Clamp speed
+            car.currentSpeed = Math.min(car.currentSpeed, adjustedTargetSpeed);
+
+            // Collision avoidance
+            this.handleCollisionAvoidance(allEntities, transform, car);
+        }
+
+        getTurnSharpness() {
+            const currentWp = this.navigator.getCurrentWaypoint();
+            const nextWp = this.track.getNextWaypoint(this.navigator.currentWaypointIndex);
+            const prevIndex = (this.navigator.currentWaypointIndex - 1 + this.track.waypoints.length) % this.track.waypoints.length;
+            const prevWp = this.track.getWaypoint(prevIndex);
+
+            const vec1 = currentWp.clone().subtract(prevWp).normalize();
+            const vec2 = nextWp.clone().subtract(currentWp).normalize();
+
+            const dot = vec1.dot(vec2);
+            return 1 - Math.abs(dot);
+        }
+
+        handleCollisionAvoidance(allEntities, transform, car) {
+            const avoidanceRadius = this.config.collisionAvoidanceRadius;
+            let avoidanceForce = new Vector2(0, 0);
+
+            for (const otherEntity of allEntities) {
+                if (otherEntity.id === this.entity.id) continue;
+
+                const otherTransform = otherEntity.getComponent('Transform');
+                if (!otherTransform) continue;
+
+                const direction = otherTransform.position.clone().subtract(transform.position);
+                const distance = direction.length();
+
+                if (distance < avoidanceRadius && distance > 0) {
+                    const avoidanceWeight = (avoidanceRadius - distance) / avoidanceRadius;
+                    avoidanceForce.add(direction.normalize().scale(avoidanceWeight));
+                }
+            }
+
+            if (avoidanceForce.length() > 0) {
+                avoidanceForce.normalize();
+                const avoidanceAngle = Math.atan2(avoidanceForce.y, avoidanceForce.x);
+                const currentAngle = transform.rotation;
+                const angleDiff = this.normalizeAngle(avoidanceAngle - currentAngle);
+
+                this.steerAngle += angleDiff * 0.5;
+            }
+        }
+
+        handleLapComplete() {
+            const ai = this.entity.getComponent('AI');
+            ai.currentLap++;
+        }
+
+        normalizeAngle(angle) {
+            while (angle > Math.PI) angle -= Math.PI * 2;
+            while (angle < -Math.PI) angle += Math.PI * 2;
+            return angle;
+        }
+
+        reset() {
+            this.navigator.reset();
+            const car = this.entity.getComponent('Car');
+            car.currentSpeed = 0;
+        }
+    }
+
+    // ============================================
+    // 12. Lap Manager
+    // ============================================
+    class LapManager {
+        constructor(track) {
+            this.track = track;
+            this.racerStates = new Map();
+        }
+
+        initializeRacer(racerId) {
+            this.racerStates.set(racerId, {
+                currentLap: 0,
+                checkpointsPassed: [],
+                lastCheckpointId: null,
+                lapTimes: [],
+                bestLapTime: Infinity,
+                totalTime: 0,
+                lapStartTime: 0,
+                hasStarted: false,
+                hasFinished: false,
+                position: 0
+            });
+        }
+
+        getRacerState(racerId) {
+            return this.racerStates.get(racerId);
+        }
+
+        checkCheckpoint(racerId, position) {
+            const state = this.getRacerState(racerId);
+            if (!state || state.hasFinished) return null;
+
+            const nearestCheckpoint = this.track.getNearestCheckpoint(position);
+
+            if (!nearestCheckpoint) return null;
+
+            if (position.distanceTo(nearestCheckpoint.position) > nearestCheckpoint.triggerRadius) {
+                return null;
+            }
+
+            const expectedCheckpoint = this.getNextExpectedCheckpoint(state);
+
+            if (nearestCheckpoint.id === expectedCheckpoint) {
+                state.checkpointsPassed.push(nearestCheckpoint.id);
+                state.lastCheckpointId = nearestCheckpoint.id;
+
+                // Check for lap completion (after passing last checkpoint)
+                if (state.lastCheckpointId === this.track.checkpoints.length - 1) {
+                    return this.completeLap(racerId);
+                }
+
+                return { type: 'checkpoint', checkpointId: nearestCheckpoint.id };
+            }
+
+            return null;
+        }
+
+        getNextExpectedCheckpoint(state) {
+            if (!state.hasStarted) {
+                return 0;
+            }
+
+            if (state.lastCheckpointId === null) {
+                return 0;
+            }
+
+            return (state.lastCheckpointId + 1) % this.track.checkpoints.length;
+        }
+
+        completeLap(racerId) {
+            const state = this.getRacerState(racerId);
+            const now = performance.now();
+            const lapTime = now - state.lapStartTime;
+
+            state.currentLap++;
+            state.lapTimes.push(lapTime);
+            state.totalTime += lapTime;
+
+            if (lapTime < state.bestLapTime) {
+                state.bestLapTime = lapTime;
+            }
+
+            state.checkpointsPassed = [];
+            state.lastCheckpointId = null;
+            state.lapStartTime = now;
+
+            return {
+                type: 'lap_complete',
+                lapNumber: state.currentLap,
+                lapTime: lapTime,
+                bestLapTime: state.bestLapTime,
+                totalTime: state.totalTime
+            };
+        }
+
+        startRacer(racerId) {
+            const state = this.getRacerState(racerId);
+            if (state && !state.hasStarted) {
+                state.hasStarted = true;
+                state.lapStartTime = performance.now();
+            }
+        }
+
+        finishRacer(racerId, numLaps) {
+            const state = this.getRacerState(racerId);
+            if (state && state.currentLap >= numLaps && !state.hasFinished) {
+                state.hasFinished = true;
+                return {
+                    type: 'race_complete',
+                    racerId: racerId,
+                    totalTime: state.totalTime,
+                    bestLapTime: state.bestLapTime,
+                    lapsCompleted: state.currentLap
+                };
+            }
+            return null;
+        }
+
+        updatePositions() {
+            const racers = Array.from(this.racerStates.entries());
+
+            racers.sort((a, b) => {
+                const stateA = a[1];
+                const stateB = b[1];
+
+                if (stateA.currentLap !== stateB.currentLap) {
+                    return stateB.currentLap - stateA.currentLap;
+                }
+
+                if (stateA.checkpointsPassed.length !== stateB.checkpointsPassed.length) {
+                    return stateB.checkpointsPassed.length - stateA.checkpointsPassed.length;
+                }
+
+                return stateA.totalTime - stateB.totalTime;
+            });
+
+            racers.forEach((racer, index) => {
+                racer[1].position = index + 1;
+            });
+        }
+
+        getRaceLeaderboard() {
+            return Array.from(this.racerStates.entries())
+                .map(([id, state]) => ({
+                    racerId: id,
+                    position: state.position,
+                    currentLap: state.currentLap,
+                    bestLapTime: state.bestLapTime,
+                    totalTime: state.totalTime,
+                    hasFinished: state.hasFinished
+                }))
+                .sort((a, b) => a.position - b.position);
+        }
+
+        reset() {
+            this.racerStates.forEach(state => {
+                state.currentLap = 0;
+                state.checkpointsPassed = [];
+                state.lastCheckpointId = null;
+                state.lapTimes = [];
+                state.bestLapTime = Infinity;
+                state.totalTime = 0;
+                state.hasStarted = false;
+                state.hasFinished = false;
+                state.position = 0;
+            });
+        }
+    }
+
+    // ============================================
+    // 13. HUD System
+    // ============================================
+    class HUD {
+        constructor(canvas) {
+            this.canvas = canvas;
+            this.ctx = canvas.getContext('2d');
+            this.fontSize = 16;
+            this.fontFamily = 'Arial, sans-serif';
+        }
+
+        render(lapManager, currentRacerId, gameTime, playerSpeed) {
+            this.clear();
+
+            this.renderPosition(lapManager, currentRacerId);
+            this.renderLapInfo(lapManager, currentRacerId);
+            this.renderTimer(gameTime);
+            this.renderLeaderboard(lapManager);
+            this.renderSpeed(playerSpeed);
+        }
+
+        clear() {
+            // Semi-transparent background for HUD overlay
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            this.ctx.fillRect(0, 0, this.canvas.width, 40);
+            this.ctx.fillRect(0, this.canvas.height - 120, this.canvas.width, 120);
+        }
+
+        renderPosition(lapManager, racerId) {
+            const state = lapManager.getRacerState(racerId);
+            if (!state) return;
+
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.font = `bold ${this.fontSize * 2}px ${this.fontFamily}`;
+            this.ctx.textAlign = 'left';
+
+            let positionText = `${state.position}th`;
+            if (state.position === 1) positionText = '1st';
+            if (state.position === 2) positionText = '2nd';
+            if (state.position === 3) positionText = '3rd';
+
+            this.ctx.fillText(`POS: ${positionText}`, 20, 28);
+        }
+
+        renderLapInfo(lapManager, racerId) {
+            const state = lapManager.getRacerState(racerId);
+            if (!state) return;
+
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.font = `${this.fontSize}px ${this.fontFamily}`;
+            this.ctx.textAlign = 'left';
+
+            this.ctx.fillText(`LAP: ${state.currentLap}`, 120, 28);
+
+            if (state.bestLapTime < Infinity) {
+                this.ctx.fillText(`BEST: ${this.formatTime(state.bestLapTime)}`, 200, 28);
+            }
+        }
+
+        renderTimer(gameTime) {
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.font = `bold ${this.fontSize}px ${this.fontFamily}`;
+            this.ctx.textAlign = 'right';
+
+            this.ctx.fillText(`TIME: ${this.formatTime(gameTime)}`, this.canvas.width - 20, 28);
+        }
+
+        renderLeaderboard(lapManager) {
+            const leaderboard = lapManager.getRaceLeaderboard();
+
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.font = `bold ${this.fontSize}px ${this.fontFamily}`;
+            this.ctx.textAlign = 'right';
+
+            this.ctx.fillText('LEADERBOARD', this.canvas.width - 20, this.canvas.height - 95);
+
+            this.ctx.font = `${this.fontSize - 2}px ${this.fontFamily}`;
+            leaderboard.slice(0, 4).forEach((racer, index) => {
+                const y = this.canvas.height - 65 - index * 22;
+                const positionText = `${racer.position}. `;
+                const timeText = this.formatTime(racer.totalTime);
+                const finishedText = racer.hasFinished ? ' [FINISHED]' : '';
+
+                this.ctx.fillText(`${positionText}${timeText}${finishedText}`, this.canvas.width - 20, y);
+            });
+        }
+
+        renderSpeed(speed) {
+            const maxSpeed = 20;
+            const displaySpeed = Math.abs(Math.round(speed * 10));
+
+            this.ctx.fillStyle = '#00ff00';
+            this.ctx.font = `bold ${this.fontSize * 1.5}px ${this.fontFamily}`;
+            this.ctx.textAlign = 'left';
+
+            this.ctx.fillText(`SPEED: ${displaySpeed}`, 20, this.canvas.height - 50);
+
+            // Speed bar
+            const barWidth = 150;
+            const barHeight = 12;
+            const speedPercent = Math.min(Math.abs(speed) / maxSpeed, 1);
+
+            this.ctx.fillStyle = '#333';
+            this.ctx.fillRect(20, this.canvas.height - 35, barWidth, barHeight);
+
+            this.ctx.fillStyle = speedPercent > 0.8 ? '#ff0000' : speedPercent > 0.5 ? '#ffff00' : '#00ff00';
+            this.ctx.fillRect(20, this.canvas.height - 35, barWidth * speedPercent, barHeight);
+
+            this.ctx.strokeStyle = '#fff';
+            this.ctx.lineWidth = 1;
+            this.ctx.strokeRect(20, this.canvas.height - 35, barWidth, barHeight);
+        }
+
+        formatTime(ms) {
+            const minutes = Math.floor(ms / 60000);
+            const seconds = Math.floor((ms % 60000) / 1000);
+            const centiseconds = Math.floor((ms % 1000) / 10);
+
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
+        }
+
+        resize(width, height) {
+            this.canvas.width = width;
+            this.canvas.height = height;
+        }
+    }
+
+    // ============================================
+    // 14. Input Handler
+    // ============================================
+    class InputHandler {
+        constructor() {
+            this.keys = {};
+            this.setupEventListeners();
+        }
+
+        setupEventListeners() {
+            window.addEventListener('keydown', (e) => {
+                this.keys[e.key] = true;
+                this.keys[e.code] = true;
+            });
+
+            window.addEventListener('keyup', (e) => {
+                this.keys[e.key] = false;
+                this.keys[e.code] = false;
+            });
+        }
+
+        isDown(key) {
+            return !!this.keys[key];
+        }
+
+        clear() {
+            this.keys = {};
+        }
+    }
+
+    // ============================================
+    // 15. Render System
+    // ============================================
+    class RenderSystem extends System {
+        constructor(canvas) {
+            super();
+            this.requiredComponents = ['Transform', 'Renderer'];
+            this.canvas = canvas;
+            this.ctx = canvas.getContext('2d');
+        }
+
+        render(interpolationAlpha, entityManager) {
+            const entities = this.getMatchingEntities(entityManager);
+
+            // Sort by draw order (y-position for pseudo-3D effect)
+            entities.sort((a, b) => {
+                const transformA = a.getComponent('Transform');
+                const transformB = b.getComponent('Transform');
+                return transformA.position.y - transformB.position.y;
+            });
+
+            for (const entity of entities) {
+                const transform = entity.getComponent('Transform');
+                const renderer = entity.getComponent('Renderer');
+
+                this.renderEntity(transform, renderer, interpolationAlpha);
+            }
+        }
+
+        renderEntity(transform, renderer, interpolationAlpha) {
+            // Interpolate position for smooth rendering
+            const interpolatedPosition = Vector2.lerp(
+                transform.previousPosition,
+                transform.position,
+                interpolationAlpha
+            );
+
+            const interpolatedRotation = transform.previousRotation +
+                (transform.rotation - transform.previousRotation) * interpolationAlpha;
+
+            this.ctx.save();
+            this.ctx.translate(interpolatedPosition.x, interpolatedPosition.y);
+            this.ctx.rotate(interpolatedRotation);
+
+            // Draw car
+            this.drawCar(renderer.color);
+
+            this.ctx.restore();
+        }
+
+        drawCar(color) {
+            // Car body
+            this.ctx.fillStyle = color;
+            this.ctx.beginPath();
+            this.ctx.roundRect(-16, -10, 32, 20, 4);
+            this.ctx.fill();
+
+            // Car roof/cockpit
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            this.ctx.beginPath();
+            this.ctx.roundRect(-8, -6, 16, 12, 2);
+            this.ctx.fill();
+
+            // Front bumper
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            this.ctx.fillRect(14, -9, 4, 18);
+
+            // Headlights
+            this.ctx.fillStyle = '#ffff00';
+            this.ctx.beginPath();
+            this.ctx.arc(16, -5, 2, 0, Math.PI * 2);
+            this.ctx.arc(16, 5, 2, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            // Rear lights
+            this.ctx.fillStyle = '#ff0000';
+            this.ctx.beginPath();
+            this.ctx.arc(-16, -5, 2, 0, Math.PI * 2);
+            this.ctx.arc(-16, 5, 2, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            // Wheels
+            this.ctx.fillStyle = '#111';
+            this.ctx.fillRect(-14, -12, 8, 4);  // Front left
+            this.ctx.fillRect(-14, 8, 8, 4);   // Rear left
+            this.ctx.fillRect(6, -12, 8, 4);   // Front right
+            this.ctx.fillRect(6, 8, 8, 4);     // Rear right
+        }
+    }
+
+    // ============================================
+    // 16. Main Game Class
+    // ============================================
+    class Game {
+        constructor(canvas) {
+            this.canvas = canvas;
+            this.ctx = canvas.getContext('2d');
+
+            // Core systems
+            this.entityManager = new EntityManager();
+            this.gameLoop = new GameLoop(this);
+            this.input = new InputHandler();
+            this.rng = new SeededRandom(12345);
+
+            // Game systems
+            this.physicsSystem = new PhysicsSystem();
+            this.carControlSystem = new CarControlSystem();
+            this.renderSystem = new RenderSystem(canvas);
+
+            // Game features
+            this.track = null;
+            this.lapManager = null;
+            this.hud = new HUD(canvas);
+
+            // Game state
+            this.isRunning = false;
+            this.gameTime = 0;
+            this.numLaps = 3;
+
+            // AI controllers
+            this.aiControllers = [];
+
+            // Initialize
+            this.initialize();
+        }
+
+        initialize() {
+            // Create track
+            this.track = this.createSampleTrack();
+            this.lapManager = new LapManager(this.track);
+
+            // Create entities
+            this.createPlayerCar();
+            this.createAICars();
+
+            // Initialize lap manager
+            this.entityManager.getActiveEntities().forEach(entity => {
+                const player = entity.getComponent('Player');
+                const ai = entity.getComponent('AI');
+                if (player || ai) {
+                    this.lapManager.initializeRacer(entity.id);
+                }
+            });
+        }
+
+        createSampleTrack() {
+            // Create an oval track with waypoints
+            const waypoints = [
+                { x: 400, y: 100 },  // Start/Finish - top
+                { x: 550, y: 80 },
+                { x: 650, y: 100 },
+                { x: 720, y: 180 },
+                { x: 740, y: 300 },
+                { x: 720, y: 420 },
+                { x: 650, y: 500 },
+                { x: 550, y: 520 },
+                { x: 400, y: 520 },
+                { x: 250, y: 500 },
+                { x: 180, y: 420 },
+                { x: 160, y: 300 },
+                { x: 180, y: 180 },
+                { x: 250, y: 100 },
+                { x: 400, y: 100 }   // Back to start
+            ];
+
+            const checkpoints = [
+                { id: 0, x: 600, y: 150, radius: 100 },  // Top right
+                { id: 1, x: 700, y: 300, radius: 100 },  // Right
+                { id: 2, x: 600, y: 450, radius: 100 },  // Bottom right
+                { id: 3, x: 400, y: 500, radius: 100 },  // Bottom
+                { id: 4, x: 200, y: 450, radius: 100 },  // Bottom left
+                { id: 5, x: 160, y: 300, radius: 100 },  // Left
+                { id: 6, x: 200, y: 150, radius: 100 }   // Top left
+            ];
+
+            const track = Track.fromDefinition({ waypoints, checkpoints });
+            track.startLine = new Vector2(400, 300);
+            return track;
+        }
+
+        createPlayerCar() {
+            const entity = this.entityManager.create();
+
+            entity.addComponent(new TransformComponent(400, 300, 0));
+            entity.addComponent(new VelocityComponent());
+            entity.addComponent(new ColliderComponent(15, 1));
+            entity.addComponent(new RigidbodyComponent(1, 0.02, 18));
+            entity.addComponent(new CarComponent(0.6, 1.0, 0.06, 18));
+            entity.addComponent(new PlayerComponent(0));
+            entity.addComponent(new RendererComponent('#ff0000'));
+
+            return entity;
+        }
+
+        createAICars() {
+            const aiConfigs = [
+                { x: 370, y: 300, color: '#00ff00', difficulty: 'easy' },
+                { x: 430, y: 300, color: '#0000ff', difficulty: 'medium' },
+                { x: 400, y: 330, color: '#ffff00', difficulty: 'hard' }
+            ];
+
+            aiConfigs.forEach((config, index) => {
+                const entity = this.entityManager.create();
+
+                entity.addComponent(new TransformComponent(config.x, config.y, 0));
+                entity.addComponent(new VelocityComponent());
+                entity.addComponent(new ColliderComponent(15, 1));
+                entity.addComponent(new RigidbodyComponent(1, 0.02, 16));
+                entity.addComponent(new CarComponent(0.5, 0.8, 0.05, 15));
+                entity.addComponent(new AIComponent(0, config.difficulty));
+                entity.addComponent(new RendererComponent(config.color));
+
+                // Create AI controller with unique RNG seed
+                const aiRng = new SeededRandom(this.rng.nextInt(0, 0xFFFFFFFF));
+                const aiController = new AIController(entity, this.track, config.difficulty, aiRng);
+                entity.aiController = aiController;
+                this.aiControllers.push(aiController);
+            });
+        }
+
+        update(deltaTime) {
+            this.gameTime += deltaTime;
+
+            // Update car control (player)
+            this.carControlSystem.update(deltaTime, this.entityManager, this.input);
+
+            // Update AI cars
+            const aiEntities = this.entityManager.getEntitiesWithComponent('AI');
+            const allEntities = this.entityManager.getActiveEntities();
+
+            aiEntities.forEach(entity => {
+                if (entity.aiController) {
+                    entity.aiController.update(deltaTime, allEntities);
+                }
+            });
+
+            // Update physics
+            this.physicsSystem.update(deltaTime, this.entityManager);
+
+            // Check checkpoints for all racers
+            this.entityManager.getActiveEntities().forEach(entity => {
+                const transform = entity.getComponent('Transform');
+                const player = entity.getComponent('Player');
+                const ai = entity.getComponent('AI');
+
+                if (player || ai) {
+                    const result = this.lapManager.checkCheckpoint(entity.id, transform.position);
+
+                    if (result) {
+                        if (result.type === 'lap_complete') {
+                            console.log(`Racer ${entity.id} completed lap ${result.lapNumber}`);
+                        }
+                    }
+
+                    // Check for race completion
+                    const finishResult = this.lapManager.finishRacer(entity.id, this.numLaps);
+                    if (finishResult) {
+                        console.log(`Racer ${entity.id} finished the race!`);
+                    }
+                }
+            });
+
+            // Update positions
+            this.lapManager.updatePositions();
+
+            // Check for restart
+            if (this.input.keys[' '] || this.input.keys['Space']) {
+                this.restart();
+            }
+        }
+
+        render(interpolationAlpha) {
+            // Clear canvas
+            this.ctx.fillStyle = '#1a1a2e';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+            // Draw grass background
+            this.ctx.fillStyle = '#1a3a1a';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+            // Render track
+            this.track.render(this.ctx);
+
+            // Render entities
+            this.renderSystem.render(interpolationAlpha, this.entityManager);
+
+            // Get player speed for HUD
+            const playerEntity = this.entityManager.getActiveEntities().find(e => e.hasComponent('Player'));
+            const playerSpeed = playerEntity ? playerEntity.getComponent('Car').currentSpeed : 0;
+
+            // Render HUD
+            this.hud.render(this.lapManager, 0, this.gameTime, playerSpeed);
+        }
+
+        start() {
+            this.isRunning = true;
+            this.gameLoop.start();
+
+            // Start all racers
+            this.entityManager.getActiveEntities().forEach(entity => {
+                const player = entity.getComponent('Player');
+                const ai = entity.getComponent('AI');
+                if (player || ai) {
+                    this.lapManager.startRacer(entity.id);
+                }
+            });
+        }
+
+        stop() {
+            this.isRunning = false;
+            this.gameLoop.stop();
+        }
+
+        restart() {
+            // Reset game time
+            this.gameTime = 0;
+
+            // Reset lap manager
+            this.lapManager.reset();
+
+            // Reset player car
+            const playerEntity = this.entityManager.getActiveEntities().find(e => e.hasComponent('Player'));
+            if (playerEntity) {
+                const transform = playerEntity.getComponent('Transform');
+                const car = playerEntity.getComponent('Car');
+                const velocity = playerEntity.getComponent('Velocity');
+
+                transform.position.copy(new Vector2(400, 300));
+                transform.rotation = 0;
+                car.currentSpeed = 0;
+                velocity.velocity.copy(new Vector2(0, 0));
+            }
+
+            // Reset AI cars
+            const aiConfigs = [
+                { x: 370, y: 300 },
+                { x: 430, y: 300 },
+                { x: 400, y: 330 }
+            ];
+
+            this.entityManager.getEntitiesWithComponent('AI').forEach((entity, index) => {
+                const transform = entity.getComponent('Transform');
+                const car = entity.getComponent('Car');
+                const velocity = entity.getComponent('Velocity');
+
+                transform.position.copy(new Vector2(aiConfigs[index].x, aiConfigs[index].y));
+                transform.rotation = 0;
+                car.currentSpeed = 0;
+                velocity.velocity.copy(new Vector2(0, 0));
+
+                if (entity.aiController) {
+                    entity.aiController.reset();
+                }
+            });
+
+            // Re-initialize lap manager
+            this.entityManager.getActiveEntities().forEach(entity => {
+                const player = entity.getComponent('Player');
+                const ai = entity.getComponent('AI');
+                if (player || ai) {
+                    this.lapManager.initializeRacer(entity.id);
+                    this.lapManager.startRacer(entity.id);
+                }
+            });
+        }
+    }
+
+    // ============================================
+    // 17. Game Initialization
+    // ============================================
+    window.addEventListener('load', () => {
+        const canvas = document.getElementById('gameCanvas');
+        const game = new Game(canvas);
+        game.start();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            // Keep canvas size fixed for consistent gameplay
+        });
+    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+- Developed in the Codex app
+- The controls are decent but the car doesn't reverse
+- The game physics is good, but the collisions don't have a lot of response from the other cars (it feels the cars are super heavy)
+- The lap counter works, but the position standings don't work properly

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Top-Down Arcade Racer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    <div id="hud">
+      <div id="hud-position">POS: 1st</div>
+      <div id="hud-lap">LAP: 1/3</div>
+      <div id="hud-time">TIME: 0:00.00</div>
+      <div id="hud-speed">SPEED: 0</div>
+    </div>
+    <div id="countdown" class="hidden"></div>
+    <div id="race-result" class="hidden">
+      <div id="result-text"></div>
+      <div id="result-time"></div>
+      <div id="restart-hint">Press ENTER to restart</div>
+    </div>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>

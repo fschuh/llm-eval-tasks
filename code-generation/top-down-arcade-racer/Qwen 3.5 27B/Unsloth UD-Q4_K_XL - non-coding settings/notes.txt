@@ -1,0 +1,3 @@
+- Developed using Roo Code
+- The model took its time and generated and ran many tests, very similar to Qwen3-Coder-Next
+- The resulting game was non-functional (javascript error)

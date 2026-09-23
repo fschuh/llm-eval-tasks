@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Top-Down Racing Prototype</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; background: #05050c; color: #f0f0f0; font-family: "IBM Plex Mono", "Source Code Pro", monospace; }
+    body { display: flex; align-items: center; justify-content: center; }
+    #game-wrapper { position: relative; width: 1200px; height: 720px; }
+    canvas { display: block; width: 100%; height: 100%; background: #05050c; border: 2px solid #3d3d50; image-rendering: auto; }
+    .hud { position: absolute; left: 12px; top: 12px; line-height: 1.6; }
+    .hud div { background: rgba(6,6,12,0.8); padding: 6px 10px; margin-bottom: 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); }
+    .hud small { display: block; color: rgba(255,255,255,0.6); font-size: 11px; }
+    .leaderboard { margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div id="game-wrapper">
+    <canvas id="race-canvas" width="1200" height="720"></canvas>
+    <div class="hud">
+      <div id="hud-lap"></div>
+      <div id="hud-time"></div>
+      <div id="hud-position"></div>
+      <div class="leaderboard" id="hud-leaderboard"></div>
+      <div id="hud-controls"><small>Controls: Arrow Up/Down = throttle/brake, Arrow Left/Right = steer</small></div>
+    </div>
+  </div>
+  <script>
+    const TOTAL_LAPS = 3;
+    const FIXED_DT = 1 / 60;
+    const rng = mulberry32(0x1bacc1a7);
+
+    const canvas = document.getElementById('race-canvas');
+    const ctx = canvas.getContext('2d');
+    const hudLap = document.getElementById('hud-lap');
+    const hudTime = document.getElementById('hud-time');
+    const hudPosition = document.getElementById('hud-position');
+    const hudLeaderboard = document.getElementById('hud-leaderboard');
+
+    const track = buildTrackGeometry(canvas.width, canvas.height);
+    const waypoints = track.waypoints;
+    const cars = [];
+    const player = createCar({ x: track.grid.start.x, y: track.grid.start.y, angle: track.grid.angle, color: '#60c2ff' });
+    cars.push(player);
+
+    const opponentColors = Array.from({ length: 3 }, () => randomPastel());
+    for (let i = 0; i < 3; i++) {
+      const offset = (i - 1.5) * 30;
+      const pos = {
+        x: track.grid.start.x + track.grid.tangent.x * offset,
+        y: track.grid.start.y + track.grid.tangent.y * offset,
+      };
+      cars.push(createCar({
+        x: pos.x,
+        y: pos.y,
+        angle: track.grid.angle,
+        color: opponentColors[i],
+        ai: true,
+        id: `AI-${i + 1}`,
+      }));
+    }
+
+    const keys = new Set();
+    window.addEventListener('keydown', (event) => {
+      if (event.code === 'Space') event.preventDefault();
+      keys.add(event.code);
+    });
+    window.addEventListener('keyup', (event) => {
+      keys.delete(event.code);
+    });
+
+    let accumulator = 0;
+    let lastTimestamp = performance.now();
+    let simulationTime = 0;
+
+    requestAnimationFrame(loop);
+
+    function loop(timestamp) {
+      const delta = (timestamp - lastTimestamp) / 1000;
+      lastTimestamp = timestamp;
+      accumulator += delta;
+
+      while (accumulator >= FIXED_DT) {
+        update(FIXED_DT);
+        simulationTime += FIXED_DT;
+        accumulator -= FIXED_DT;
+      }
+
+      render();
+      requestAnimationFrame(loop);
+    }
+
+    function update(dt) {
+      cars.forEach((car) => {
+        if (car.completed) {
+          car.velocity.x *= 0.97;
+          car.velocity.y *= 0.97;
+          car.pos.x += car.velocity.x * dt;
+          car.pos.y += car.velocity.y * dt;
+          return;
+        }
+
+        if (car.ai) {
+          runAI(car, dt);
+        } else {
+          handlePlayerInput(car, dt);
+        }
+
+        car.pos.x += car.velocity.x * dt;
+        car.pos.y += car.velocity.y * dt;
+
+        applyWallCollisions(car);
+        updateWaypointProgress(car);
+      });
+
+      resolveCarCollisions();
+      updateProgress();
+      updateHUD();
+    }
+
+    function runAI(car, dt) {
+      const target = waypoints[car.currentWaypoint];
+      const next = waypoints[(car.currentWaypoint + 1) % waypoints.length];
+      const toTarget = { x: target.x - car.pos.x, y: target.y - car.pos.y };
+      const desiredAngle = Math.atan2(toTarget.y, toTarget.x);
+      const steerDelta = normalizeAngle(desiredAngle - car.angle);
+      const steerInput = Math.sign(steerDelta) * Math.min(Math.abs(steerDelta) / (Math.PI / 2), 1);
+      applySteering(car, steerInput, dt);
+
+      const forward = { x: Math.cos(car.angle), y: Math.sin(car.angle) };
+      const speedAlongHeading = forward.x * car.velocity.x + forward.y * car.velocity.y;
+      const idealSpeed = car.maxSpeed * (0.6 + 0.4 * (1 - Math.min(Math.abs(steerDelta) / Math.PI, 1)));
+      const speedDiff = idealSpeed - speedAlongHeading;
+      const throttleInput = clamp(speedDiff / car.maxSpeed, -1, 1);
+      applyThrottle(car, throttleInput, dt);
+    }
+
+    function handlePlayerInput(car, dt) {
+      let throttle = 0;
+      if (keys.has('ArrowUp') || keys.has('KeyW')) throttle += 1;
+      if (keys.has('ArrowDown') || keys.has('KeyS')) throttle -= 1;
+      const steer = (keys.has('ArrowRight') || keys.has('KeyD') ? 1 : 0) - (keys.has('ArrowLeft') || keys.has('KeyA') ? 1 : 0);
+      applySteering(car, steer, dt);
+      applyThrottle(car, throttle, dt);
+    }
+
+    function applySteering(car, input, dt) {
+      const speed = Math.hypot(car.velocity.x, car.velocity.y);
+      const responsiveness = 0.4 + 0.6 * Math.min(speed / car.maxSpeed, 1);
+      car.angle += input * car.turnSpeed * dt * responsiveness;
+    }
+
+    function applyThrottle(car, input, dt) {
+      const forward = { x: Math.cos(car.angle), y: Math.sin(car.angle) };
+      const force = input >= 0 ? input * car.engineForce : input * car.brakeForce;
+      car.velocity.x += forward.x * force * dt;
+      car.velocity.y += forward.y * force * dt;
+
+      const speed = Math.sqrt(car.velocity.x * car.velocity.x + car.velocity.y * car.velocity.y);
+      if (speed > car.maxSpeed) {
+        const scale = car.maxSpeed / speed;
+        car.velocity.x *= scale;
+        car.velocity.y *= scale;
+      }
+
+      const speedAlongHeading = forward.x * car.velocity.x + forward.y * car.velocity.y;
+      if (speedAlongHeading > car.maxSpeed) {
+        car.velocity.x -= forward.x * (speedAlongHeading - car.maxSpeed);
+        car.velocity.y -= forward.y * (speedAlongHeading - car.maxSpeed);
+      }
+      if (speedAlongHeading < -car.maxReverse) {
+        car.velocity.x -= forward.x * (speedAlongHeading + car.maxReverse);
+        car.velocity.y -= forward.y * (speedAlongHeading + car.maxReverse);
+      }
+
+      applyDrag(car, dt);
+    }
+
+    function applyDrag(car, dt) {
+      const drag = 1 + car.drag * dt;
+      car.velocity.x /= drag;
+      car.velocity.y /= drag;
+    }
+
+    function applyWallCollisions(car) {
+      track.boundaries.forEach((segment) => {
+        const toCar = { x: car.pos.x - segment.a.x, y: car.pos.y - segment.a.y };
+        const proj = clamp(dot(toCar, segment.tangent), 0, segment.length);
+        const closest = {
+          x: segment.a.x + segment.tangent.x * proj,
+          y: segment.a.y + segment.tangent.y * proj,
+        };
+        const offset = { x: car.pos.x - closest.x, y: car.pos.y - closest.y };
+        const distAlongNormal = dot(offset, segment.normal);
+        const dist = Math.hypot(offset.x, offset.y);
+        if (distAlongNormal > 0 && dist < car.radius + 0.1) {
+          const penetration = car.radius - dist;
+          car.pos.x -= segment.normal.x * penetration;
+          car.pos.y -= segment.normal.y * penetration;
+          resolveWallBounce(car, segment.normal);
+        }
+      });
+    }
+
+    function resolveWallBounce(car, normal) {
+      const vn = dot(car.velocity, normal);
+      if (vn > 0) {
+        const bounce = vn * 1.2;
+        car.velocity.x -= normal.x * bounce;
+        car.velocity.y -= normal.y * bounce;
+      }
+    }
+
+    function resolveCarCollisions() {
+      for (let i = 0; i < cars.length; i++) {
+        for (let j = i + 1; j < cars.length; j++) {
+          const a = cars[i];
+          const b = cars[j];
+          const dx = a.pos.x - b.pos.x;
+          const dy = a.pos.y - b.pos.y;
+          const dist = Math.hypot(dx, dy);
+          const minDist = a.radius + b.radius;
+          if (dist > 0 && dist < minDist) {
+            const normal = { x: dx / dist, y: dy / dist };
+            const penetration = minDist - dist;
+            a.pos.x += normal.x * (penetration * 0.5);
+            a.pos.y += normal.y * (penetration * 0.5);
+            b.pos.x -= normal.x * (penetration * 0.5);
+            b.pos.y -= normal.y * (penetration * 0.5);
+
+            const relVel = dot({ x: a.velocity.x - b.velocity.x, y: a.velocity.y - b.velocity.y }, normal);
+            if (relVel > 0) continue;
+            const impulse = -relVel * 0.7;
+            a.velocity.x += normal.x * impulse;
+            a.velocity.y += normal.y * impulse;
+            b.velocity.x -= normal.x * impulse;
+            b.velocity.y -= normal.y * impulse;
+          }
+        }
+      }
+    }
+
+    function updateProgress() {
+      cars.forEach((car) => {
+        const current = waypoints[car.currentWaypoint];
+        const next = waypoints[(car.currentWaypoint + 1) % waypoints.length];
+        const segmentLength = distance(current, next);
+        const toNext = distance(car.pos, next);
+        const ratio = segmentLength ? 1 - Math.min(toNext / segmentLength, 1) : 0;
+        car.progress = car.lap * waypoints.length + car.currentWaypoint + ratio;
+      });
+    }
+
+    function updateWaypointProgress(car) {
+      const target = waypoints[car.currentWaypoint];
+      const dist = distance(car.pos, target);
+      if (dist < 32) {
+        const previous = car.currentWaypoint;
+        car.currentWaypoint = (car.currentWaypoint + 1) % waypoints.length;
+        if (previous === waypoints.length - 1 && car.currentWaypoint === 0) {
+          completeLap(car);
+        }
+      }
+    }
+
+    function updateHUD() {
+      hudLap.textContent = `Lap ${Math.min(player.lap + 1, TOTAL_LAPS)}/${TOTAL_LAPS}` + (player.completed ? ' (Finished)' : '');
+      hudTime.textContent = `Time ${formatTime(simulationTime)}`;
+      const standings = [...cars]
+        .sort((a, b) => b.progress - a.progress)
+        .map((car, index) => ({ car, index }));
+      const playerPosition = standings.find((entry) => entry.car === player).index + 1;
+      hudPosition.textContent = `Position ${ordinal(playerPosition)}/${cars.length}`;
+      hudLeaderboard.innerHTML = standings
+        .map(
+          (entry) =>
+            `${entry.index + 1}. ${entry.car.alias} (Lap ${Math.min(entry.car.lap + 1, TOTAL_LAPS)})`
+        )
+        .join('<br>');
+    }
+
+    function completeLap(car) {
+      if (car.completed) return;
+      car.lap += 1;
+      const now = simulationTime;
+      const lapDuration = now - car.lapStartTime;
+      car.lapTimes.push(lapDuration);
+      car.lapStartTime = now;
+      if (car.lap >= TOTAL_LAPS) {
+        car.completed = true;
+        car.finalTime = now;
+      }
+    }
+
+    function buildTrackGeometry(width, height) {
+      const center = { x: width / 2, y: height / 2 };
+      const radiusX = 320;
+      const radiusY = 220;
+      const trackWidth = 140;
+      const sampleCount = 96;
+      const finishAngle = -Math.PI / 2;
+
+      const outer = buildEllipsePoints(center, radiusX + trackWidth / 2, radiusY + trackWidth / 2, sampleCount);
+      const inner = buildEllipsePoints(center, radiusX - trackWidth / 2, radiusY - trackWidth / 2, sampleCount);
+      const waypoints = buildEllipsePoints(center, radiusX, radiusY, sampleCount);
+
+      const finishBase = {
+        x: center.x + Math.cos(finishAngle) * radiusX,
+        y: center.y + Math.sin(finishAngle) * radiusY,
+      };
+      const finishLine = {
+        start: {
+          x: finishBase.x + Math.cos(finishAngle - Math.PI / 2) * 40,
+          y: finishBase.y + Math.sin(finishAngle - Math.PI / 2) * 40,
+        },
+        end: {
+          x: finishBase.x + Math.cos(finishAngle + Math.PI / 2) * 40,
+          y: finishBase.y + Math.sin(finishAngle + Math.PI / 2) * 40,
+        },
+      };
+
+      const outerSegments = buildSegments(outer, false);
+      const innerSegments = buildSegments(inner, true);
+
+      const finishDir = normalize({ x: finishLine.end.x - finishLine.start.x, y: finishLine.end.y - finishLine.start.y });
+      const tangent = { x: -finishDir.y, y: finishDir.x };
+      const startSpot = {
+        x: finishBase.x + tangent.x * 20,
+        y: finishBase.y + tangent.y * 20,
+        angle: finishAngle + Math.PI * 0.05,
+        tangent,
+      };
+
+      return {
+        outer,
+        inner,
+        waypoints,
+        boundaries: [...outerSegments, ...innerSegments],
+        finishLine,
+        grid: startSpot,
+      };
+    }
+
+    function buildEllipsePoints(center, rx, ry, count) {
+      const points = [];
+      const startAngle = -Math.PI / 2;
+      for (let i = 0; i < count; i++) {
+        const angle = startAngle + (i / count) * Math.PI * 2;
+        points.push({
+          x: center.x + Math.cos(angle) * rx,
+          y: center.y + Math.sin(angle) * ry,
+        });
+      }
+      return points;
+    }
+
+    function buildSegments(points, invert) {
+      const segments = [];
+      for (let i = 0; i < points.length; i++) {
+        const a = points[i];
+        const b = points[(i + 1) % points.length];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const len = Math.hypot(dx, dy);
+        const tangent = len ? { x: dx / len, y: dy / len } : { x: 0, y: 0 };
+        const normal = len
+          ? normalize(invert ? { x: -dy, y: dx } : { x: dy, y: -dx })
+          : { x: 0, y: 0 };
+        segments.push({ a, b, length: len, tangent, normal });
+      }
+      return segments;
+    }
+
+    function createCar({ x, y, angle, color, ai = false, id = 'Player' }) {
+      const car = {
+        alias: ai ? id : 'Player',
+        pos: { x, y },
+        angle,
+        radius: 16,
+        velocity: { x: 0, y: 0 },
+        engineForce: ai ? 200 + rng() * 80 : 220,
+        brakeForce: 280,
+        drag: 0.9,
+        turnSpeed: 2.4,
+        maxSpeed: ai ? 210 + rng() * 60 : 240,
+        maxReverse: 90,
+        lap: 0,
+        lapTimes: [],
+        lapStartTime: 0,
+        currentWaypoint: 0,
+        progress: 0,
+        ai,
+        color,
+        completed: false,
+      };
+      return car;
+    }
+
+    function dot(a, b) {
+      return a.x * b.x + a.y * b.y;
+    }
+
+    function normalize(vec) {
+      const len = Math.hypot(vec.x, vec.y);
+      return len ? { x: vec.x / len, y: vec.y / len } : { x: 0, y: 0 };
+    }
+
+    function distance(a, b) {
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+
+    function normalizeAngle(angle) {
+      while (angle > Math.PI) angle -= Math.PI * 2;
+      while (angle < -Math.PI) angle += Math.PI * 2;
+      return angle;
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function formatTime(value) {
+      const minutes = Math.floor(value / 60);
+      const seconds = value % 60;
+      return `${minutes}:${seconds.toFixed(2).padStart(5, '0')}`;
+    }
+
+    function ordinal(value) {
+      const suffix = ['th', 'st', 'nd', 'rd'];
+      const mod100 = value % 100;
+      return `${value}${mod100 >= 11 && mod100 <= 13 ? 'th' : suffix[Math.min(value % 10, 3)] || 'th'}`;
+    }
+
+    function randomPastel() {
+      const hue = Math.floor(rng() * 360);
+      const sat = 65 + rng() * 25;
+      const light = 55 + rng() * 20;
+      return `hsl(${hue}, ${sat}%, ${light}%)`;
+    }
+
+    function mulberry32(seed) {
+      return function () {
+        let t = (seed += 0x6d2b79f5);
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawEnvironment();
+      drawTrack();
+      drawCars();
+    }
+
+    function drawEnvironment() {
+      ctx.fillStyle = '#05050c';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function drawTrack() {
+      ctx.fillStyle = '#1f1f28';
+      ctx.beginPath();
+      track.outer.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.closePath();
+      ctx.moveTo(track.inner[0].x, track.inner[0].y);
+      track.inner.forEach((point, index) => {
+        if (index === 0) return;
+        ctx.lineTo(point.x, point.y);
+      });
+      ctx.closePath();
+      ctx.fill('evenodd');
+
+      ctx.strokeStyle = '#383c58';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      track.outer.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.closePath();
+      ctx.stroke();
+
+      ctx.beginPath();
+      track.inner.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.closePath();
+      ctx.stroke();
+
+      ctx.strokeStyle = '#ffffffaa';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(track.finishLine.start.x, track.finishLine.start.y);
+      ctx.lineTo(track.finishLine.end.x, track.finishLine.end.y);
+      ctx.stroke();
+    }
+
+    function drawCars() {
+      cars.forEach((car) => {
+        ctx.save();
+        ctx.translate(car.pos.x, car.pos.y);
+        ctx.rotate(car.angle);
+        ctx.fillStyle = car.color;
+        ctx.fillRect(-car.radius * 1.2, -car.radius * 0.8, car.radius * 2.4, car.radius * 1.6);
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-car.radius * 1.2, -car.radius * 0.8, car.radius * 2.4, car.radius * 1.6);
+        ctx.restore();
+      });
+    }
+  </script>
+</body>
+</html>
