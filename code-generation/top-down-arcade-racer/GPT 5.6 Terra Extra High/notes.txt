@@ -1,0 +1,9 @@
+- Developed in Codex
+- The game is functional
+- Controls and collision physics are ok but poor collision feedback from walls (edge of track)
+- Car reverse is correct
+- Lap bug is not present
+- The race ends after completing the last lap
+- The track has as trange oval shape, and the broken white lines rotate around the track which is very odd
+- The finish line is not aligned correctly to the track
+- The cars cast shadows but it has a simple oval shape and the effect does not look good

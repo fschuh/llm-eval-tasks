@@ -1,0 +1,8 @@
+- Developed in Codex
+- The game is functional
+- Controls are ok but the collision physics have nonexisting collision response when hitting other cars or walls (the edge of the track)
+- Car reverse is correct
+- Race standings work
+- The race ends after completing the last lap
+- The track is to narrow and the collision boxes of the car is too wide, making it very difficult to overtake other cars
+- Some of the race standings UI covers part of the track

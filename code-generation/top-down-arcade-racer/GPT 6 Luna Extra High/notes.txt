@@ -1,0 +1,8 @@
+- Developed in Codex
+- The game is functional
+- The controls and collision physics are ok but the player's car is too fast compared to the other cars, and there isn't much collision feedback when hitting walls (the edge of the track)
+- Race standings work
+- Car reverse is correct
+- The AI is very simple and just follows a fixed path
+- The race ends after completing the last lap
+- Lap bug is present (go forward and backwards over the finish line and it counts as a lap)

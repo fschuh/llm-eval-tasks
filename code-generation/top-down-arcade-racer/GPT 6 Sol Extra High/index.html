@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#111a1d" />
+    <title>APEX / Top-Down Racer</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="game.js" defer></script>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">A<span>///</span></span>
+          <div>
+            <h1>APEX</h1>
+            <p>Top-down circuit racer</p>
+          </div>
+        </div>
+        <div class="header-right">
+          <span class="seed" id="seed-label">SEED 00000</span>
+          <button id="restart-button" type="button">↻ &nbsp; Restart race</button>
+        </div>
+      </header>
+
+      <section class="game-frame" aria-label="Racing game">
+        <canvas id="game" width="1200" height="760" aria-label="Top-down race track with four cars"></canvas>
+
+        <div class="hud hud-left" aria-live="off">
+          <div class="hud-kicker">RACE TELEMETRY</div>
+          <div class="position-row"><span id="position">1</span><small>/ 4<br />POSITION</small></div>
+          <div class="hud-divider"></div>
+          <div class="stat-grid">
+            <div><small>LAP</small><strong id="lap">1 / 3</strong></div>
+            <div><small>RACE TIME</small><strong id="time">00:00.00</strong></div>
+            <div><small>BEST LAP</small><strong id="best-lap">--:--.--</strong></div>
+            <div><small>SPEED</small><strong><span id="speed">0</span> <em>km/h</em></strong></div>
+          </div>
+        </div>
+
+        <div class="hud hud-right">
+          <div class="hud-kicker">LIVE STANDINGS</div>
+          <ol id="standings" class="standings"></ol>
+        </div>
+
+        <div class="center-message" id="center-message" aria-live="polite">
+          <span class="message-eyebrow" id="message-eyebrow">GET READY</span>
+          <span class="message-main" id="message-main">3</span>
+          <span class="message-foot" id="message-foot">3 laps · 4 drivers</span>
+        </div>
+
+        <div class="track-badge">CIRCUIT 01 <span>•</span> 3 LAPS</div>
+      </section>
+
+      <footer class="controls">
+        <div class="control-copy">
+          <span class="control-title">CONTROLS</span>
+          <span><kbd>W</kbd><kbd>↑</kbd> accelerate</span>
+          <span><kbd>S</kbd><kbd>↓</kbd> brake / reverse</span>
+          <span><kbd>A</kbd><kbd>←</kbd> and <kbd>D</kbd><kbd>→</kbd> steer</span>
+          <span><kbd>P</kbd> pause &nbsp; <kbd>R</kbd> restart</span>
+        </div>
+        <div class="control-note">Keep it between the kerbs. Pass the checkpoints to complete a lap.</div>
+      </footer>
+
+      <div class="touch-controls" aria-label="Touch driving controls">
+        <div class="touch-group">
+          <button type="button" data-control="left" aria-label="Steer left">◀</button>
+          <button type="button" data-control="right" aria-label="Steer right">▶</button>
+        </div>
+        <div class="touch-group">
+          <button type="button" data-control="brake" aria-label="Brake or reverse">BRAKE</button>
+          <button type="button" data-control="accelerate" aria-label="Accelerate">GO</button>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
