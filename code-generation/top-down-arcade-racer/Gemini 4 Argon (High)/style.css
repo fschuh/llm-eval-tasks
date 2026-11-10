@@ -1,0 +1,205 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0d1117;
+  color: #e6edf3;
+  font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  user-select: none;
+}
+
+.viewport {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+#gameCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Top HUD Telemetry Bar */
+.hud-top {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: none;
+  gap: 12px;
+}
+
+.hud-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hud-card {
+  background: rgba(12, 17, 26, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 8px 14px;
+  min-width: 112px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.hud-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8b9bb4;
+  margin-bottom: 3px;
+}
+
+.hud-value {
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+}
+
+.hud-value.accent-cyan {
+  color: #00ffff;
+}
+
+.hud-value.accent-gold {
+  color: #ffdd57;
+}
+
+.hud-value.accent-green {
+  color: #00ff9d;
+}
+
+/* Live Standings Panel */
+.hud-standings-card {
+  background: rgba(12, 17, 26, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 10px 14px;
+  min-width: 235px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.standing-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.standing-row.is-player {
+  background: rgba(0, 255, 255, 0.14);
+  font-weight: 700;
+  color: #00ffff;
+}
+
+.standing-rank {
+  width: 22px;
+  font-weight: 700;
+}
+
+.standing-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.standing-name {
+  flex: 1;
+}
+
+.standing-lap {
+  color: #b5c2d9;
+  font-weight: 600;
+}
+
+/* Bottom Controls & Seed Bar */
+.hud-bottom {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(12, 17, 26, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 10px 14px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.controls-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.seed-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8b9bb4;
+}
+
+.seed-input {
+  background: #161f30;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 12px;
+  width: 110px;
+  font-family: monospace;
+}
+
+.hud-btn {
+  background: #233149;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #e6edf3;
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.hud-btn:hover {
+  background: #32476b;
+}
+
+.help-text {
+  font-size: 11px;
+  color: #9fb0c9;
+}
+
+.help-text kbd {
+  background: #1d2738;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-family: monospace;
+  color: #00ffff;
+}

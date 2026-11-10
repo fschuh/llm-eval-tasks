@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Top-Down 2D Arcade Racer Prototype</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="viewport">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Top HUD: Position, Lap, Timers, Speed & Live Standings -->
+    <header class="hud-top">
+      <div class="hud-cards">
+        <div class="hud-card">
+          <span class="hud-label">Position</span>
+          <span class="hud-value accent-cyan" id="hudPosition">4th / 4</span>
+        </div>
+        <div class="hud-card">
+          <span class="hud-label">Lap</span>
+          <span class="hud-value accent-gold" id="hudLap">1 / 3</span>
+        </div>
+        <div class="hud-card">
+          <span class="hud-label">Race Time</span>
+          <span class="hud-value" id="hudRaceTime">00:00.000</span>
+        </div>
+        <div class="hud-card">
+          <span class="hud-label">Current Lap</span>
+          <span class="hud-value" id="hudCurrLap">00:00.000</span>
+        </div>
+        <div class="hud-card">
+          <span class="hud-label">Best Lap</span>
+          <span class="hud-value accent-green" id="hudBestLap">--:--.---</span>
+        </div>
+        <div class="hud-card">
+          <span class="hud-label">Last Lap</span>
+          <span class="hud-value" id="hudLastLap">--:--.---</span>
+        </div>
+        <div class="hud-card">
+          <span class="hud-label">Speed</span>
+          <span class="hud-value accent-cyan" id="hudSpeed">0 km/h</span>
+        </div>
+      </div>
+
+      <div class="hud-standings-card">
+        <span class="hud-label">Live Standings</span>
+        <div id="hudStandings"></div>
+      </div>
+    </header>
+
+    <!-- Bottom HUD: Deterministic Seed, AI Pathfinding Mode & Controls -->
+    <footer class="hud-bottom">
+      <div class="controls-row">
+        <label class="seed-label" for="seedInput">RNG Seed:</label>
+        <input id="seedInput" class="seed-input" type="text" value="20260501" />
+        <button id="btnRestart" class="hud-btn" type="button">Restart w/ Seed (R)</button>
+        <button id="btnAiMode" class="hud-btn" type="button">AI: A* + Waypoints</button>
+        <button id="btnDebug" class="hud-btn" type="button">Toggle Path Overlay (V)</button>
+        <span class="seed-label" id="hudTick">Tick #0 (60 Hz)</span>
+      </div>
+      <div class="help-text">
+        Controls: <kbd>W</kbd>/<kbd>↑</kbd> Accelerate &nbsp;|&nbsp;
+        <kbd>S</kbd>/<kbd>↓</kbd> Brake/Reverse &nbsp;|&nbsp;
+        <kbd>A</kbd><kbd>D</kbd>/<kbd>←</kbd><kbd>→</kbd> Steer &nbsp;|&nbsp;
+        <kbd>Space</kbd> Handbrake/Drift &nbsp;|&nbsp;
+        <kbd>P</kbd> Pause (<kbd>N</kbd> Step Tick)
+      </div>
+    </footer>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

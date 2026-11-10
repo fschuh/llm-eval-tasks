@@ -1,0 +1,14 @@
+- Developed in OpenCode
+- The game is functional
+- The controls are good and responsive
+- The collision physics are a bit off, the cars slow down too much on impact instead of rebounding from each other
+- Car reverse is correct
+- The AI is strong, with two modes: waypoint only and waypoint + A* (in which the AI avoids other cars pretty well)
+- The track design and visuals are not very good, with debug lines that overlap and can't be turned off
+- There's debug lines to keep track of the laps and they can't be turned off
+- The cars glow white when they collide, which feels like a debug effect
+- There's a very weird circle particle effect when cars collide, which looks bad
+- Race standings are functional
+- The UI is a bit glitchy, with a shake effect due to the high resolution timers that count very quickly
+- Completing all laps ends the race
+- Lap bug is not present
