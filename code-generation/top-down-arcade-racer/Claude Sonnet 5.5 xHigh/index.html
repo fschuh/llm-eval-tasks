@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Top-Down Arcade Racer</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #11181f; overflow: hidden; }
+    #game { display: block; width: 100vw; height: 100vh; }
+    noscript { color: #fff; font: 16px system-ui, sans-serif; position: fixed; inset: 40px; }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <noscript>This game needs JavaScript.</noscript>
+
+  <!-- Classic scripts (not ES modules) so the game also works when opened straight from disk. -->
+  <script src="src/config.js"></script>
+  <script src="src/rng.js"></script>
+  <script src="src/track.js"></script>
+  <script src="src/car.js"></script>
+  <script src="src/collision.js"></script>
+  <script src="src/ai.js"></script>
+  <script src="src/race.js"></script>
+  <script src="src/loop.js"></script>
+  <script src="src/render.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>

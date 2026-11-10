@@ -1,0 +1,19 @@
+- Developed in Claude Code
+- The game is functional
+- The game is titled "Tarmac Sprint"
+- Dynamic camera that automatically zooms int/out according to the car's speed
+- Optional overhead camera that follows the car's rotation
+- Beautiful track, with zebras and grass traps, a zebra-patterned wall, surrounded by grass in a grid-like pattern and trees, and a grand stand
+- At the start of the race, there is a countdown traffic light that turns from red to green
+- The track has a visible darkened line that shows the optimal path
+- The controls feel stiff and the car turns slower as it gets faster
+- Completing laps is very challenging and requires using the brakes
+- No handbrake
+- When braking, Cars leave permanent brake marks on the track, and also (strangely) on the grass
+- Functional mini map
+- Speed meter
+- The cars cast shadows
+- The screen shakes when crashing at high speeds
+- Race standings are functional
+- The race ends after completing all laps
+- The player car drives itself around the track after race ends

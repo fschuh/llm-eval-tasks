@@ -1,0 +1,12 @@
+{
+  "name": "top-down-arcade-racer",
+  "version": "1.0.0",
+  "description": "Deterministic top-down 2D racing prototype: fixed timestep, seeded RNG, waypoint-following AI, impulse collisions.",
+  "private": true,
+  "scripts": {
+    "test": "node test/run.js",
+    "report": "node tools/report.js 1 12",
+    "serve": "python3 -m http.server 8080"
+  },
+  "license": "MIT"
+}

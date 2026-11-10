@@ -1,0 +1,13 @@
+- Developed in Claude Code
+- The game is functional
+- Track is well designed, with walls, gravel traps, zebras and surrounded by grass and trees
+- Car reverse is correct
+- Good controls, but car physics is not very realistic especially the way it turns (the rear feels like it's detached from the ground)
+- Collision physics are realistic and responsive
+- The screen shakes when the car crashes at high speeds
+- Car has handbrake, and leaves smoke and permanent tire marks on the track
+- Driving on the gravel slows down car and leaves smoke trails
+- Good AI, it avoids collisions and attempts to get out of the way and overtake other cars
+- Functional mini map
+- Functional race standings
+- The race ends after completing all laps
